@@ -133,7 +133,7 @@ void main(void)		/* This really IS void, no error here. */
 	buffer_init(buffer_memory_end);
 	hd_init();
 	floppy_init();
-	sti();
+	sti(); // 因为在 setup.s line 109 关闭了中断
 	move_to_user_mode();
 	if (!fork()) {		/* we count on this going ok */
 		init();

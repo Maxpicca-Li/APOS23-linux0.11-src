@@ -14,6 +14,12 @@
 
 ! NOTE! These had better be the same as in bootsect.s!
 
+! 1. 装载机器系统数据 system data --> CMOS 小芯片单独存储，易失性，由电池续命，但低耗电
+!    copy 的数据原始存放在 BIOS start-up 的区域
+!    光标、显示、硬件配置信息等
+! 2. 关中断，中断机制的废旧立新过程
+!    EFLAGS.IF = 0 
+
 INITSEG  = 0x9000	! we move boot here - out of the way
 SYSSEG   = 0x1000	! system loaded at 0x10000 (65536).
 SETUPSEG = 0x9020	! this is the current segment
@@ -28,7 +34,7 @@ begbss:
 .text
 
 entry start
-start:
+start:              ! 拷贝系统数据
 
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
@@ -106,7 +112,7 @@ is_disk1:
 
 ! now we want to move to protected mode ...
 
-	cli			! no interrupts allowed !
+	cli			! no interrupts allowed ! 拷贝完关中断，开始中断模式的废旧立新 --> 简单说就是覆盖掉 BIOS 那块数据
 
 ! first we move the system to it's rightful place
 
@@ -130,10 +136,10 @@ do_move:
 end_move:
 	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
 	mov	ds,ax
-	lidt	idt_48		! load idt with 0,0
-	lgdt	gdt_48		! load gdt with whatever appropriate
+	lidt	idt_48		! load idt with 0,0 (idt 表格设置)
+	lgdt	gdt_48		! load gdt with whatever appropriate (gdt 表格设置)
 
-! that was painless, now we enable A20
+! that was painless, now we enable A20 | 打开 A20 线后的寻址使能
 
 	call	empty_8042
 	mov	al,#0xD1		! command write
@@ -149,7 +155,7 @@ end_move:
 ! messed this up with the original PC, and they haven't been able to
 ! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
 ! which is used for the internal hardware interrupts as well. We just
-! have to reprogram the 8259's, and it isn't fun.
+! have to reprogram the 8259's, and it isn't fun. (重新映射中断)
 
 	mov	al,#0x11		! initialization sequence
 	out	#0x20,al		! send it to 8259A-1
@@ -187,10 +193,11 @@ end_move:
 ! things as simple as possible, we do no register set-up or anything,
 ! we let the gnu-compiled 32-bit programs do that. We just jump to
 ! absolute address 0x00000, in 32-bit protected mode.
+! 设置 CR0.PF 开启保护模式
 
-	mov	ax,#0x0001	! protected mode (PE) bit
+	mov	ax,#0x0001	! protected mode (PE) bit ! 保护模式新纪元
 	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs) ! 和 cs 结构相关，跳到 head.s 继续执行 
 
 ! This routine checks that the keyboard command queue is empty
 ! No timeout is used - if this hangs there is something wrong with
@@ -202,7 +209,7 @@ empty_8042:
 	jnz	empty_8042	! yes - loop
 	ret
 
-gdt:
+gdt: ! gdt 的数据
 	.word	0,0,0,0		! dummy
 
 	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
@@ -215,11 +222,11 @@ gdt:
 	.word	0x9200		! data read/write
 	.word	0x00C0		! granularity=4096, 386
 
-idt_48:
-	.word	0			! idt limit=0
+idt_48: ! 设置base和限长
+	.word	0			! idt limit=0 
 	.word	0,0			! idt base=0L
 
-gdt_48:
+gdt_48: ! gdt base + limit
 	.word	0x800		! gdt limit=2048, 256 GDT entries
 	.word	512+gdt,0x9	! gdt base = 0X9xxxx
 	

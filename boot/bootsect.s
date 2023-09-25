@@ -31,33 +31,40 @@ begdata:
 begbss:
 .text
 
+! 注意：16位数的都是段地址, 后面少了4位 offset
+! 如 0x9000, 针对的字节地址为 0x90000
+! 先做内存布局
 SETUPLEN = 4					! nr of setup-sectors
 BOOTSEG  = 0x07c0			! original address of boot-sector
 INITSEG  = 0x9000			! we move boot here - out of the way
+! 说明 init 需要 1KB, 即 0x90200-0x90000
 SETUPSEG = 0x9020			! setup starts here
 SYSSEG   = 0x1000			! system loaded at 0x10000 (65536).
+! head.s 数据，之后会覆盖掉 BIOS 中断数据，直接到 0x0000
 ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
 
 ! ROOT_DEV:	0x000 - same type of floppy as boot.
 !		0x301 - first partition on first drive etc
+! 根设备, 如硬盘等
 ROOT_DEV = 0x306
 
+! 边执行边把自己从 BOOTSEG 拷贝到 INITSEG, 一共 1KB, 0x90000 - 0x90200
 entry start
-start:
-	mov	ax,#BOOTSEG
+start:                          ! 07c00 开始
+	mov	ax,#BOOTSEG				! ax, temp 变量
 	mov	ds,ax
 	mov	ax,#INITSEG
-	mov	es,ax
-	mov	cx,#256
-	sub	si,si
+	mov	es,ax					! ds = BOOTSEG, es = INITSEG
+	mov	cx,#256					! cx 计数器
+	sub	si,si					! 清零
 	sub	di,di
-	rep
-	movw
+	rep 						! TODO: 啥意思
+	movw                        ! 每次拷贝一word, 4字节, 一共1KB, 故需要拷贝 256 次
 	jmpi	go,INITSEG
 go:	mov	ax,cs
 	mov	ds,ax
 	mov	es,ax
-! put stack at 0x9ff00.
+! put stack at 0x9ff00. 设置栈, 用于跑子程序
 	mov	ss,ax
 	mov	sp,#0xFF00		! arbitrary value >>512
 
@@ -69,13 +76,13 @@ load_setup:
 	mov	cx,#0x0002		! sector 2, track 0
 	mov	bx,#0x0200		! address = 512, in INITSEG
 	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
-	int	0x13			! read it
+	int	0x13			! read it 根据中断将 setup.s 的数据, 前面的 mov 是在设置参数
 	jnc	ok_load_setup		! ok - continue
 	mov	dx,#0x0000
 	mov	ax,#0x0000		! reset the diskette
 	int	0x13
 	j	load_setup
-
+                        ! set systerm kernel data 在哪里
 ok_load_setup:
 
 ! Get disk drive parameters, specifically nr of sectors/track
@@ -136,7 +143,7 @@ root_defined:
 ! the setup-routine loaded directly after
 ! the bootblock:
 
-	jmpi	0,SETUPSEG
+	jmpi	0,SETUPSEG      ! bootsect.s 任务完成，开始执行 setup.s 的内容
 
 ! This routine loads the system at address 0x10000, making sure
 ! no 64kB boundaries are crossed. We try to load it as fast as
