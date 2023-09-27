@@ -13,16 +13,17 @@
  */
 .text
 .globl _idt,_gdt,_pg_dir,_tmp_floppy_area
-_pg_dir:
-startup_32:
-	movl $0x10,%eax
+_pg_dir:                    # 页目录地址
+startup_32:                 # virtual address 0x0000
+	# $0x10, 也是选择子 ==> 10|0|00 第3项|GDT|00特权级 ==> GDT第2项指向内核数据段
+    movl $0x10,%eax         # 将 %eax, %ds, %es, %fs, %gs 对其内核数据段
 	mov %ax,%ds
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss _stack_start,%esp
+	lss _stack_start,%esp   # lss 用户载入指令，设置用户栈，设置大小为 PAGE_SIZE 4KB
 	call setup_idt
-	call setup_gdt
+	call setup_gdt          # FIXME lyq: 为什么要重复做一次
 	movl $0x10,%eax		# reload all the segment registers
 	mov %ax,%ds		# after changing gdt. CS was already
 	mov %ax,%es		# reloaded in 'setup_gdt'
@@ -30,8 +31,8 @@ startup_32:
 	mov %ax,%gs
 	lss _stack_start,%esp
 	xorl %eax,%eax
-1:	incl %eax		# check that A20 really IS enabled
-	movl %eax,0x000000	# loop forever if it isn't
+1:	incl %eax		# check that A20 really IS enabled (确认 A20 打开)
+	movl %eax,0x000000	# loop forever if it isn't (超过一个值就回滚 # FIXME lyq: 没 get 到这个检查)
 	cmpl %eax,0x100000
 	je 1b
 /*
@@ -77,7 +78,7 @@ check_x87:
  */
 setup_idt:
 	lea ignore_int,%edx
-	movl $0x00080000,%eax
+	movl $0x00080000,%eax # eax[15:0]=baseaddress[15:0], eax[31:16]=段选择子=0x0008 --> 内核代码段
 	movw %dx,%ax		/* selector = 0x0008 = cs */
 	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
 
@@ -103,7 +104,7 @@ rp_sidt:
  *  This routine will beoverwritten by the page tables.
  */
 setup_gdt:
-	lgdt gdt_descr
+	lgdt gdt_descr          # 装载 gdt 数据
 	ret
 
 /*
@@ -133,15 +134,18 @@ _tmp_floppy_area:
 	.fill 1024,1,0
 
 after_page_tables:
-	pushl $0		# These are the parameters to main :-)
+	# main 函数的参数
+    pushl $0		# These are the parameters to main :-)
 	pushl $0
 	pushl $0
-	pushl $L6		# return address for main, if it decides to.
-	pushl $_main
+	# 加入 main 函数 return 地址
+    pushl $L6		# return address for main, if it decides to.
+	# pushl & jmp ==> call _main, 但这里并没有直接调用 _main，而是调用 setup_paging 然后返回到 _main 的调用 _main 的模式
+    pushl $_main    # 操作系统内核代码的 main 函数地址，C语言标准 _functionName ==> 谁调用 main, 舍我其谁! 严谨!
 	jmp setup_paging
 L6:
 	jmp L6			# main should never return here, but
-				# just in case, we know what happens.
+				    # just in case, we know what happens.
 
 /* This is the default interrupt "handler" :-) */
 int_msg:
@@ -197,25 +201,26 @@ ignore_int:
 .align 2
 setup_paging:
 	movl $1024*5,%ecx		/* 5 pages - pg_dir+4 page tables */
-	xorl %eax,%eax
+	xorl %eax,%eax          # 清零
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
-	cld;rep;stosl
-	movl $pg0+7,_pg_dir		/* set present bit/user r/w */
+	cld;rep;stosl           # FIXME lyq: 调整方向
+	# 7=0b111, 用于设置页属性, |...|1|1|1| ==> |...|特权|可读写|存在性| 
+    movl $pg0+7,_pg_dir		/* set present bit/user r/w */
 	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
-	movl $pg3+4092,%edi
-	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
+	movl $pg3+4092,%edi     # 覆盖页目录项
+	movl $0xfff007,%eax		# 覆盖页表项 /*  16Mb - 4096 + 7 (r/w user,p) */
 	std
 1:	stosl			/* fill pages backwards - more efficient :-) */
 	subl $0x1000,%eax
 	jge 1b
 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
 	movl %eax,%cr3		/* cr3 - page directory start */
-	movl %cr0,%eax
-	orl $0x80000000,%eax
+	movl %cr0,%eax      # eax = cr0
+	orl $0x80000000,%eax   # 设置最高位为1，即 CR0.PG
 	movl %eax,%cr0		/* set paging (PG) bit */
-	ret			/* this also flushes prefetch-queue */
+	ret			/* this also flushes prefetch-queue, ret 回到栈首，栈首是 _main，即用 setup_paging 的返回来调用 main 函数，牛啊!*/
 
 .align 2
 .word 0
@@ -234,5 +239,5 @@ _idt:	.fill 256,8,0		# idt is uninitialized
 _gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c09a0000000fff	/* 16Mb */
 	.quad 0x00c0920000000fff	/* 16Mb */
-	.quad 0x0000000000000000	/* TEMPORARY - don't use */
+	.quad 0x0000000000000000	/* TEMPORARY - don't use 用于隔离 */
 	.fill 252,8,0			/* space for LDT's and TSS's etc */

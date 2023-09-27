@@ -212,11 +212,13 @@ empty_8042:
 gdt: ! gdt 的数据
 	.word	0,0,0,0		! dummy
 
+	! 内核代码段
 	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
 	.word	0x0000		! base address=0
 	.word	0x9A00		! code read/exec
 	.word	0x00C0		! granularity=4096, 386
 
+	! 内核数据段
 	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
 	.word	0x0000		! base address=0
 	.word	0x9200		! data read/write
