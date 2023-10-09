@@ -19,7 +19,22 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 
 #define iret() __asm__ ("iret"::)
 
-// gcc 嵌入汇编：gate_addr，对应中断号在中断描述符表中的偏移值；type，中断描述符的类型；dpl，特权级
+/*
+gcc 嵌入汇编：
+    gate_addr，对应中断号在中断描述符表中的地址；
+    type，中断描述符的类型；
+    dpl，特权级；
+    addr，中断服务程序地址
+%%ax = %%dx; %%dx = %0 后的结果如下：
+    addr[31:16] -> edx h
+    1000 1111 0000 0000 -> dx
+    段选择子 0x0008 -> eax h
+    addr[15:0] -> ax
+%1 = %%eax; %2 = %%edx 即把寄存器的结果写入到IDT对应的位置中：
+    gate_addr: eax -> [31: 0]
+               edx -> [63:32]
+(*((char *) (gate_addr)))：(解引用(指针))，即该内存地址对应的数据
+*/
 #define _set_gate(gate_addr,type,dpl,addr) \
 __asm__ ("movw %%dx,%%ax\n\t" \
 	"movw %0,%%dx\n\t" \
@@ -31,12 +46,15 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 	"o" (*(4+(char *) (gate_addr))), \
 	"d" ((char *) (addr)),"a" (0x00080000))
 
+// 中断门：硬件或软件异常/中断
 #define set_intr_gate(n,addr) \
 	_set_gate(&idt[n],14,0,addr)
 
+// 陷阱门：相关指令执行
 #define set_trap_gate(n,addr) \
 	_set_gate(&idt[n],15,0,addr)
 
+// 任务门：系统调用
 #define set_system_gate(n,addr) \
 	_set_gate(&idt[n],15,3,addr)
 
