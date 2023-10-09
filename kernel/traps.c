@@ -182,7 +182,8 @@ void trap_init(void)
 {
 	int i;
 
-	set_trap_gate(0,&divide_error);
+    // 设置中断描述符表 （索引，服务程序地址）
+	set_trap_gate(0,&divide_error); // 设置除操作出错的中断向量值。以下雷同。
 	set_trap_gate(1,&debug);
 	set_trap_gate(2,&nmi);
 	set_system_gate(3,&int3);	/* int3-5 can be called from all */

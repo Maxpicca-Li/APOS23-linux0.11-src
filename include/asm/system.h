@@ -19,6 +19,7 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 
 #define iret() __asm__ ("iret"::)
 
+// gcc 嵌入汇编：gate_addr，对应中断号在中断描述符表中的偏移值；type，中断描述符的类型；dpl，特权级
 #define _set_gate(gate_addr,type,dpl,addr) \
 __asm__ ("movw %%dx,%%ax\n\t" \
 	"movw %0,%%dx\n\t" \

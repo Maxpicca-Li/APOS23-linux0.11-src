@@ -24,9 +24,9 @@ struct request {
 	int dev;		/* -1 if no request */
 	int cmd;		/* READ or WRITE */
 	int errors;
-	unsigned long sector;
+	unsigned long sector;       // 扇区
 	unsigned long nr_sectors;
-	char * buffer;
+	char * buffer;              // 缓冲区
 	struct task_struct * waiting;
 	struct buffer_head * bh;
 	struct request * next;
@@ -43,6 +43,7 @@ struct request {
 (s1)->sector < (s2)->sector)))
 
 struct blk_dev_struct {
+	// fn: function, 请求项函数地址/函数指针：用于块设备（硬盘/软盘/虚拟盘）读写
 	void (*request_fn)(void);
 	struct request * current_request;
 };

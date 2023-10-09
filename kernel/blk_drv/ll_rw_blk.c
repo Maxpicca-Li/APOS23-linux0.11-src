@@ -30,13 +30,13 @@ struct task_struct * wait_for_request = NULL;
  *	next-request
  */
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
-	{ NULL, NULL },		/* no_dev */
-	{ NULL, NULL },		/* dev mem */
-	{ NULL, NULL },		/* dev fd */
-	{ NULL, NULL },		/* dev hd */
+	{ NULL, NULL },		/* no_dev 无设备*/
+	{ NULL, NULL },		/* dev mem 内存 ramdisk */
+	{ NULL, NULL },		/* dev fd 软驱设备 */
+	{ NULL, NULL },		/* dev hd 硬盘设备 */
 	{ NULL, NULL },		/* dev ttyx */
 	{ NULL, NULL },		/* dev tty */
-	{ NULL, NULL }		/* dev lp */
+	{ NULL, NULL }		/* dev lp 打印机设备 */
 };
 
 static inline void lock_buffer(struct buffer_head * bh)

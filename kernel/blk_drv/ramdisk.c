@@ -54,7 +54,9 @@ long rd_init(long mem_start, int length)
 	int	i;
 	char	*cp;
 
+	// blk_dev[1] 对应 ramdisk, 将 do rd request 函数服务程序，挂载到函数指针
 	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	// memory ramdisk 清零
 	rd_start = (char *) mem_start;
 	rd_length = length;
 	cp = rd_start;

@@ -54,6 +54,7 @@ extern long startup_time;
 
 /*
  * This is set up by the setup-routine at boot-time
+ * 放置机器系统数据，0x90002 表示扩展内存（系统从1MB开始的扩展内存数值/KB）
  */
 #define EXT_MEM_K (*(unsigned short *)0x90002)
 #define DRIVE_INFO (*(struct drive_info *)0x90080)
@@ -111,16 +112,21 @@ void main(void)		/* This really IS void, no error here. */
  	drive_info = DRIVE_INFO;
 	memory_end = (1<<20) + (EXT_MEM_K<<10);
 	memory_end &= 0xfffff000;
+	// 针对物理内存条的实际大小，对内存进行不同的规划
 	if (memory_end > 16*1024*1024)
 		memory_end = 16*1024*1024;
 	if (memory_end > 12*1024*1024) 
-		buffer_memory_end = 4*1024*1024;
+		buffer_memory_end = 4*1024*1024; // 0x3FFFFF
 	else if (memory_end > 6*1024*1024)
 		buffer_memory_end = 2*1024*1024;
 	else
 		buffer_memory_end = 1*1024*1024;
+	// ｜ 缓冲区 ｜ 主存开始+虚拟盘 ｜ ... | 物理内存末端
+	// 缓冲区是硬盘和内存之间的代理
+	// 虚拟盘：为了跑得快
 	main_memory_start = buffer_memory_end;
 #ifdef RAMDISK
+	// AKA. rd 虚拟盘设置
 	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
 #endif
 	mem_init(main_memory_start,memory_end);

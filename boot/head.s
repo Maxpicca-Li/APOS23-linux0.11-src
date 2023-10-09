@@ -237,7 +237,7 @@ gdt_descr:
 _idt:	.fill 256,8,0		# idt is uninitialized
 
 _gdt:	.quad 0x0000000000000000	/* NULL descriptor */
-	.quad 0x00c09a0000000fff	/* 16Mb */
-	.quad 0x00c0920000000fff	/* 16Mb */
-	.quad 0x0000000000000000	/* TEMPORARY - don't use 用于隔离 */
+	.quad 0x00c09a0000000fff	/* 16Mb 内核代码段, 段选择子 0x8 */
+	.quad 0x00c0920000000fff	/* 16Mb 内核数据段, 段选择子 0x10 */
+	.quad 0x0000000000000000	/* TEMPORARY - don't use 用于隔离 LDT 和 TSS */
 	.fill 252,8,0			/* space for LDT's and TSS's etc */

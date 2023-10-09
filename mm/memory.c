@@ -40,9 +40,9 @@ static inline volatile void oom(void)
 __asm__("movl %%eax,%%cr3"::"a" (0))
 
 /* these are not to be changed without changing head.s etc */
-#define LOW_MEM 0x100000
+#define LOW_MEM 0x100000 // 扩展内存对应物理地址的开始地址（多于1MB的内存为扩展内存）
 #define PAGING_MEMORY (15*1024*1024)
-#define PAGING_PAGES (PAGING_MEMORY>>12)
+#define PAGING_PAGES (PAGING_MEMORY>>12) // 0xFFFF00
 #define MAP_NR(addr) (((addr)-LOW_MEM)>>12)
 #define USED 100
 
@@ -54,7 +54,7 @@ static long HIGH_MEMORY = 0;
 #define copy_page(from,to) \
 __asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024):"cx","di","si")
 
-static unsigned char mem_map [ PAGING_PAGES ] = {0,};
+static unsigned char mem_map [ PAGING_PAGES ] = {0,}; // 物理地址空间，以页为单位进行管理，记录引用计数
 
 /*
  * Get physical address of first (actually last :-) free page, and mark it
@@ -402,10 +402,10 @@ void mem_init(long start_mem, long end_mem)
 
 	HIGH_MEMORY = end_mem;
 	for (i=0 ; i<PAGING_PAGES ; i++)
-		mem_map[i] = USED;
+		mem_map[i] = USED; // 使用的数量，USED 默认设置为100，一般进程有 64，不可能到100，说明这块数据不允许人再申请
 	i = MAP_NR(start_mem);
 	end_mem -= start_mem;
-	end_mem >>= 12;
+	end_mem >>= 12; // end_mem 目前表示 page 的数量
 	while (end_mem-->0)
 		mem_map[i++]=0;
 }
