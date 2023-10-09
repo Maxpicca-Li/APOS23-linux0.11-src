@@ -344,6 +344,8 @@ void do_tty_interrupt(int tty)
 	copy_to_cooked(tty_table+tty);
 }
 
+// 标准输出（终端）+标准输入（标准的键盘设备），只和字符IO相关，即 stdio
+// 注意显示屏外设，按照像素管理，不属于字符设备
 void chr_dev_init(void)
 {
 }

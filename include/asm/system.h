@@ -54,7 +54,7 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 #define set_trap_gate(n,addr) \
 	_set_gate(&idt[n],15,0,addr)
 
-// 任务门：系统调用
+// 任务门：进程调用/系统调用等
 #define set_system_gate(n,addr) \
 	_set_gate(&idt[n],15,3,addr)
 

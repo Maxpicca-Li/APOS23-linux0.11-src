@@ -5,12 +5,15 @@
 /*
  * NR_REQUEST is the number of entries in the request-queue.
  * NOTE that writes may use only the low 2/3 of these: reads
- * take precedence.
+ * take precedence. 写操作仅使用这些项低端的 2/3；读操作优先处理。
  *
  * 32 seems to be a reasonable number: enough to get some benefit
  * from the elevator-mechanism, but not so much as to lock a lot of
  * buffers when they are in the queue. 64 seems to be too many (easily
  * long pauses in reading when heavy writing/syncing is going on)
+ * 32 项好象是一个合理的数字：已经足够从电梯算法中获得好处， 
+ * 但当缓冲区在队列中而锁住时又不显得是很大的数。64 就看上 
+ * 去太大了（当大量的写/同步操作运行时很容易引起长时间的暂停）。
  */
 #define NR_REQUEST	32
 
@@ -19,17 +22,18 @@
  * request for paging requests when that is implemented. In
  * paging, 'bh' is NULL, and 'waiting' is used to wait for
  * read/write completion.
+ * 请求项：进程数据与硬盘、软盘、其他外设等的交互，都需要由请求项管理
  */
 struct request {
-	int dev;		/* -1 if no request */
+	int dev;		/* -1 if no request 使用的设备号 */
 	int cmd;		/* READ or WRITE */
-	int errors;
-	unsigned long sector;       // 扇区
-	unsigned long nr_sectors;
-	char * buffer;              // 缓冲区
-	struct task_struct * waiting;
-	struct buffer_head * bh;
-	struct request * next;
+	int errors;                             // 操作时产生的错误次数
+	unsigned long sector;                   // 起始扇区。(1 块=2 扇区)
+	unsigned long nr_sectors;               // 读/写扇区数
+    char * buffer;                          // 缓冲区
+	struct task_struct * waiting;           // 任务等待操作执行完成的地方。 
+	struct buffer_head * bh;                // 缓冲区头指针(include/linux/fs.h,68)。 
+	struct request * next;                  // 指向下一请求项。
 };
 
 /*

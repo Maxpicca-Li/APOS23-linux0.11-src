@@ -35,7 +35,7 @@
 /*
  * These are set up by the setup-routine at boot-time:
  */
-
+// 0x90000 机器系统数据所在代码段
 #define ORIG_X			(*(unsigned char *)0x90000)
 #define ORIG_Y			(*(unsigned char *)0x90001)
 #define ORIG_VIDEO_PAGE		(*(unsigned short *)0x90004)
@@ -613,6 +613,7 @@ void con_write(struct tty_struct * tty)
  *
  * Reads the information preserved by setup.s to determine the current display
  * type and sets everything accordingly.
+ * 控制台显示设置
  */
 void con_init(void)
 {

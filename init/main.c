@@ -132,10 +132,10 @@ void main(void)		/* This really IS void, no error here. */
 	mem_init(main_memory_start,memory_end);
 	trap_init();
 	blk_dev_init();
-	chr_dev_init();
-	tty_init();
-	time_init();
-	sched_init();
+	chr_dev_init();     // 字符设备，标准输入输出
+	tty_init();         // 电传打印机(Teleprinter)
+	time_init();        // 系统时钟设置
+	sched_init();       // 进程设置+系统调用相关【重要】
 	buffer_init(buffer_memory_end);
 	hd_init();
 	floppy_init();

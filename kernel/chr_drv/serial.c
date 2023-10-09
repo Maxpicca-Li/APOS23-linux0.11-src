@@ -36,6 +36,7 @@ static void init(int port)
 
 void rs_init(void)
 {
+	// 和中断相关 --> 电传打印需要中断响应
 	set_intr_gate(0x24,rs1_interrupt);
 	set_intr_gate(0x23,rs2_interrupt);
 	init(tty_table[1].read_q.data);

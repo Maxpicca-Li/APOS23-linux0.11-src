@@ -17,6 +17,7 @@
 /*
  * The request-struct contains all necessary data
  * to load a nr of sectors into memory
+ * 请求结构包含将扇区加载到内存中的所有必要数据
  */
 struct request request[NR_REQUEST];
 
