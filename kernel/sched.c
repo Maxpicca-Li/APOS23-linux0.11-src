@@ -50,11 +50,13 @@ extern void mem_use(void);
 extern int timer_interrupt(void);
 extern int system_call(void);
 
+// 两项共用体，一个 task_union 一个页，4KB
 union task_union {
-	struct task_struct task;
-	char stack[PAGE_SIZE];
+	struct task_struct task; // 顶多占到一页
+	char stack[PAGE_SIZE];   // 内核栈，精心测算，内核代码压栈绝对不会覆盖 task_struct
 };
 
+// 静态全局变量，static 赋予内部链接，即其只能在定义它的源文件中访问
 static union task_union init_task = {INIT_TASK,};
 
 long volatile jiffies=0;
@@ -388,16 +390,18 @@ void sched_init(void)
 	struct desc_struct * p;
 
 	if (sizeof(struct sigaction) != 16)
+		// printk
 		panic("Struct sigaction MUST be 16 bytes");
 	// 设置 TSS（task state segment） 和 LDT ==> 和用户进程开始相关
 	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
-	p = gdt+2+FIRST_TSS_ENTRY;
+	p = gdt+2+FIRST_TSS_ENTRY; // TSS1
+	// LDT1\TSS1 之后的63个进程全部初始化
 	for(i=1;i<NR_TASKS;i++) {
 		task[i] = NULL;
-		p->a=p->b=0;
+		p->a=p->b=0; // TSS 1..63
 		p++;
-		p->a=p->b=0;
+		p->a=p->b=0; // LDT 1..63
 		p++;
 	}
 /* Clear NT, so that we won't have troubles with that later on */

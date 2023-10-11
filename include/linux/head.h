@@ -1,6 +1,7 @@
 #ifndef _HEAD_H
 #define _HEAD_H
 
+// 64字节的结构
 typedef struct desc_struct {
 	unsigned long a,b;
 } desc_table[256];

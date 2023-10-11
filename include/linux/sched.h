@@ -75,6 +75,7 @@ struct tss_struct {
 	struct i387_struct i387;
 };
 
+// NOTE!!!一个进程一个
 struct task_struct {
 /* these are hardcoded - don't touch */
 	long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -109,6 +110,10 @@ struct task_struct {
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
+ * 进程0，进程的起源，手写完成
+ *  -> 源于 Unix 的进程创建原则，即父进程创建子进程 -> 保证操作系统的绝对管理地位
+ *  -> 道生一，一生二，二生三，三生万物
+ * 面向对象 -> 模子原则，即类型创建对象
  */
 #define INIT_TASK \
 /* state etc */	{ 0,15,15, \
@@ -126,6 +131,7 @@ struct task_struct {
 		{0x9f,0xc0f200}, \
 	}, \
 /*tss*/	{0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir,\
+	 // 下面这行第二个0是EFLAGS，赋值为0，也关了中断
 	 0,0,0,0,0,0,0,0, \
 	 0,0,0x17,0x17,0x17,0x17,0x17,0x17, \
 	 _LDT(0),0x80000000, \
