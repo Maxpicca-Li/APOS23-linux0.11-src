@@ -457,6 +457,7 @@ void do_fd_request(void)
 void floppy_init(void)
 {
 	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	// 没有设置 set_intr_gate，而是 set_trap_gate
 	set_trap_gate(0x26,&floppy_interrupt);
 	outb(inb_p(0x21)&~0x40,0x21);
 }

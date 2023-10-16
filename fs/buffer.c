@@ -27,8 +27,11 @@
 #include <asm/io.h>
 
 extern int end;
+// 管理 buffer
 struct buffer_head * start_buffer = (struct buffer_head *) &end;
+// 本身 buffer 给了 307 项
 struct buffer_head * hash_table[NR_HASH];
+// 记录 free 的buffer
 static struct buffer_head * free_list;
 static struct task_struct * buffer_wait = NULL;
 int NR_BUFFERS = 0;
@@ -365,8 +368,9 @@ void buffer_init(long buffer_end)
 		h->b_next = NULL;
 		h->b_prev = NULL;
 		h->b_data = (char *) b;
-		h->b_prev_free = h-1;
-		h->b_next_free = h+1;
+		// 设置 hash_table 前后项的环链
+		h->b_prev_free = h-1; // bufferIdx - 1
+		h->b_next_free = h+1; // bufferIdx + 1
 		h++;
 		NR_BUFFERS++;
 		if (b == (void *) 0x100000)

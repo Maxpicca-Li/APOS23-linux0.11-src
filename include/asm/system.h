@@ -1,4 +1,24 @@
 #define move_to_user_mode() \
+/*
+eax=esp
+push 5个值到 user_stack，模拟了3特权级的中断压栈过程
+	ss:     0x17 = 0b10|1|11 = 数据段|ldt|3特权级，对应 ss，stack segment
+	esp:    esp，之前eax=esp，已经赋值了
+	eflags: pushfl
+	cs:     0x0f = 0b 1|1|11 = 代码段|ldt|3特权级，对应 cs，code segment
+	eip:    $1f: 1 forward，前面的1 label，相当于 eip（$1b: 1back，后面的1 label）
+iret 中断返回，和 main 函数手法类似
+	函数调用：时间已知，由编译器进行压栈
+	中断调用：时间未知，由硬件机制进行压栈，压的内容由ISA决定
+    此后，进程0开始执行
+1: return 的地址，即之前 pushl $1f（eip）。这里进程0的代码开始对齐特权级
+    eax = 0x17
+    ds = ax
+    es = ax
+    fs = ax
+    gs = ax
+至此，进程0的状态数据完成，其中 sched_init 完成了 TSS、LDT、TR、LDTR 的加载，这里完成了用户模式的切换。
+*/
 __asm__ ("movl %%esp,%%eax\n\t" \
 	"pushl $0x17\n\t" \
 	"pushl %%eax\n\t" \

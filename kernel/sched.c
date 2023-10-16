@@ -66,6 +66,7 @@ struct task_struct *last_task_used_math = NULL;
 
 struct task_struct * task[NR_TASKS] = {&(init_task.task), };
 
+// 进程 0 的用户栈
 long user_stack [ PAGE_SIZE>>2 ] ;
 
 struct {
@@ -392,7 +393,7 @@ void sched_init(void)
 	if (sizeof(struct sigaction) != 16)
 		// printk
 		panic("Struct sigaction MUST be 16 bytes");
-	// 设置 TSS（task state segment） 和 LDT ==> 和用户进程开始相关
+	// 设置第一个 TSS（task state segment） 和 LDT ==> 和用户进程开始相关
 	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
 	p = gdt+2+FIRST_TSS_ENTRY; // TSS1
@@ -406,14 +407,14 @@ void sched_init(void)
 	}
 /* Clear NT, so that we won't have troubles with that later on */
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
-	ltr(0);		// load task register
+	ltr(0);		// load task register，指向当前的 tss
 	lldt(0);	// load ldt
+	// 设置时钟中断
 	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-	// 设置时钟中断
 	set_intr_gate(0x20,&timer_interrupt);
-	outb(inb_p(0x21)&~0x01,0x21);
 	// 设置系统调用
+	outb(inb_p(0x21)&~0x01,0x21);
 	set_system_gate(0x80,&system_call);
 }

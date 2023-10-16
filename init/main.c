@@ -136,12 +136,12 @@ void main(void)		/* This really IS void, no error here. */
 	tty_init();         // 电传打印机(Teleprinter)
 	time_init();        // 系统时钟设置
 	sched_init();       // 进程设置+系统调用相关【重要】
-	buffer_init(buffer_memory_end);
-	hd_init();
-	floppy_init();
-	sti(); // 因为在 setup.s line 109 关闭了中断
-	move_to_user_mode();
-	if (!fork()) {		/* we count on this going ok */
+	buffer_init(buffer_memory_end); // 普通文件块设备的缓冲区->为了跑得更快
+	hd_init();          // hard disk 初始化
+	floppy_init();      // 软盘系统初始化
+	sti();              // 因为在 setup.s line 109 关闭了中断
+	move_to_user_mode();// 转换特权级 0->3，进程0开始执行，之后的代码均为进程0来执行
+    if (!fork()) {		/* we count on this going ok 创建进程 */
 		init();
 	}
 /*
