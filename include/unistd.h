@@ -57,6 +57,8 @@
 
 #ifdef __LIBRARY__
 
+// 分配单位：授权单位，其设置基于人的需求进行设置的
+// 授权对象：单次访问，即单次访问具备这样的权利
 #define __NR_setup	0	/* used only by init, to get system going */
 #define __NR_exit	1
 #define __NR_fork	2
@@ -130,6 +132,11 @@
 #define __NR_setreuid	70
 #define __NR_setregid	71
 
+/*
+volatile:	防止 C++ 内存优化，即存取都从内存中调用，而不是 cache
+int $0x80: 	系统调用, __NR_fork = 2
+##:			命名链接，这里为传入的变量名，fork
+*/
 #define _syscall0(type,name) \
 type name(void) \
 { \
@@ -137,7 +144,7 @@ long __res; \
 __asm__ volatile ("int $0x80" \
 	: "=a" (__res) \
 	: "0" (__NR_##name)); \
-if (__res >= 0) \
+/* int $0x80 压栈时的 eip */if (__res >= 0) \
 	return (type) __res; \
 errno = -__res; \
 return -1; \

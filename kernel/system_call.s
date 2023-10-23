@@ -58,6 +58,7 @@ sa_mask = 4
 sa_flags = 8
 sa_restorer = 12
 
+# 一共有 72 个 __NR_##name 入口
 nr_system_calls = 72
 
 /*
@@ -78,6 +79,7 @@ reschedule:
 	jmp _schedule
 .align 2
 _system_call:
+	# 1: 判断数组是否越界；2: 拦截不确定性，防止不确定性的系统中断发生，避免其越权
 	cmpl $nr_system_calls-1,%eax
 	ja bad_sys_call
 	push %ds
@@ -86,11 +88,12 @@ _system_call:
 	pushl %edx
 	pushl %ecx		# push %ebx,%ecx,%edx as parameters
 	pushl %ebx		# to the system call
-	movl $0x10,%edx		# set up ds,es to kernel space
+	movl $0x10,%edx		# set up ds,es to kernel space $0x10 为内核数据段
 	mov %dx,%ds
 	mov %dx,%es
 	movl $0x17,%edx		# fs points to local data space
 	mov %dx,%fs
+	# _sys_call_table + %eax * 4, 为 _sys_call_table[%eax] 的物理地址
 	call _sys_call_table(,%eax,4)
 	pushl %eax
 	movl _current,%eax
@@ -207,6 +210,7 @@ _sys_execve:
 .align 2
 _sys_fork:
 	call _find_empty_process
+	# 这个啥意思
 	testl %eax,%eax
 	js 1f
 	push %gs

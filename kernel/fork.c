@@ -65,16 +65,21 @@ int copy_mem(int nr,struct task_struct * p)
  * information (task[nr]) and sets up the necessary registers. It
  * also copies the data segment in it's entirety.
  */
-int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
-		long ebx,long ecx,long edx,
-		long fs,long es,long ds,
+// NOTE lyq: 核心代码+1!
+// 参数右序进栈
+int copy_process(
+		// _sys_fork 调用__copy_process前的压栈，nr 是eax中的值，此时已经被复制为分配的pid的值，即1
+		int nr,long ebp,long edi,long esi,long gs,
+		// _system_call 调用__sys_fork前的压栈, 其中 long none 表示 call _sys_call_table(,%eax,4)，供 iret 返回确定位置
+		long none,long ebx,long ecx,long edx, long fs,long es,long ds,
+		// int $0x80 中断压栈
 		long eip,long cs,long eflags,long esp,long ss)
 {
 	struct task_struct *p;
 	int i;
 	struct file *f;
 
-	p = (struct task_struct *) get_free_page();
+	p = (struct task_struct *) get_free_page(); // 获得一个空闲页，账本 mem_map -> 用于分配内存（如空闲页、共享页）
 	if (!p)
 		return -EAGAIN;
 	task[nr] = p;
@@ -139,8 +144,14 @@ int find_empty_process(void)
 
 	repeat:
 		if ((++last_pid)<0) last_pid=1;
+		/* 理解
+		++last_pid; // 每来一个 find_empty_process 就 +1, 之后都会保证 last_pid 为接下来可新分配的pid (注意 pid 从 0 开始算)
+		if (last_pid<0) last_pid=1; // 防止溢出
+		*/
 		for(i=0 ; i<NR_TASKS ; i++)
+			// 防止此时 last_pid 已经分配了，则需要 last_pid 再加 1，然后重新进行检查
 			if (task[i] && task[i]->pid == last_pid) goto repeat;
+	// 找空闲的 task
 	for(i=1 ; i<NR_TASKS ; i++)
 		if (!task[i])
 			return i;

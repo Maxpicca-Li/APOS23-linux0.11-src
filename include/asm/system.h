@@ -1,6 +1,7 @@
 #define move_to_user_mode() \
 /*
 eax=esp
+这里的 %%esp 是 0、3 特权共用的栈，iret前是0特权的，iret后是3特权的，为进程0的用户栈。
 push 5个值到 user_stack，模拟了3特权级的中断压栈过程
 	ss:     0x17 = 0b10|1|11 = 数据段|ldt|3特权级，对应 ss，stack segment
 	esp:    esp，之前eax=esp，已经赋值了
@@ -18,6 +19,8 @@ iret 中断返回，和 main 函数手法类似
     fs = ax
     gs = ax
 至此，进程0的状态数据完成，其中 sched_init 完成了 TSS、LDT、TR、LDTR 的加载，这里完成了用户模式的切换。
+
+之所以此时是进程0的，是因为 sched_init 中 ldtr 和 tr 设置为了进程 0
 */
 __asm__ ("movl %%esp,%%eax\n\t" \
 	"pushl $0x17\n\t" \
