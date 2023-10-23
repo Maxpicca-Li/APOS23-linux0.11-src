@@ -41,15 +41,15 @@ int copy_mem(int nr,struct task_struct * p)
 	unsigned long old_data_base,new_data_base,data_limit;
 	unsigned long old_code_base,new_code_base,code_limit;
 
-	code_limit=get_limit(0x0f);
-	data_limit=get_limit(0x17);
+	code_limit=get_limit(0x0f); // 获得父进程的代码段限长 01 code seg.｜1 ldt｜11 3 pri.
+	data_limit=get_limit(0x17); // 获得父进程的数据段限长 10 data seg.｜1 ldt｜11 3 pri.
 	old_code_base = get_base(current->ldt[1]);
 	old_data_base = get_base(current->ldt[2]);
 	if (old_data_base != old_code_base)
 		panic("We don't support separate I&D");
 	if (data_limit < code_limit)
 		panic("Bad data_limit");
-	new_data_base = new_code_base = nr * 0x4000000;
+	new_data_base = new_code_base = nr * 0x4000000; // 0b100 * 2^24 Byte = 0b1000000 * 2^20 = 64 MB
 	p->start_code = new_code_base;
 	set_base(p->ldt[1],new_code_base);
 	set_base(p->ldt[2],new_data_base);
@@ -65,7 +65,7 @@ int copy_mem(int nr,struct task_struct * p)
  * information (task[nr]) and sets up the necessary registers. It
  * also copies the data segment in it's entirety.
  */
-// NOTE lyq: 核心代码+1!
+// NOTE lyq: 核心代码+1! 所有进程创建都是 copy_process
 // 参数右序进栈
 int copy_process(
 		// _sys_fork 调用__copy_process前的压栈，nr 是eax中的值，此时已经被复制为分配的pid的值，即1
@@ -75,16 +75,21 @@ int copy_process(
 		// int $0x80 中断压栈
 		long eip,long cs,long eflags,long esp,long ss)
 {
+	// 新进程的值
 	struct task_struct *p;
 	int i;
 	struct file *f;
 
-	p = (struct task_struct *) get_free_page(); // 获得一个空闲页，账本 mem_map -> 用于分配内存（如空闲页、共享页）
-	if (!p)
+	// 获得一个空闲页，账本 mem_map -> 用于分配内存（如空闲页、共享页）
+	// 强制类型转换，即把这个页当作 task_struct 使用
+	p = (struct task_struct *) get_free_page();
+	if (!p) // 结果检测
 		return -EAGAIN;
 	task[nr] = p;
+	// 复制进程 0 的 task_struct 内容，此时 ldt & tss 也一样，为后面的 copy and write 做了准备 -> 开始的时候共享，当子进程write的时候，才开始加载
 	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
-	p->state = TASK_UNINTERRUPTIBLE;
+	p->state = TASK_UNINTERRUPTIBLE; // 只有内核代码中明确表示将该进程设置为就绪状态才能被唤醒; 除此之外，没有任何办法将其唤醒
+	// 进程自定义设置
 	p->pid = last_pid;
 	p->father = current->pid;
 	p->counter = p->priority;
@@ -95,11 +100,11 @@ int copy_process(
 	p->cutime = p->cstime = 0;
 	p->start_time = jiffies;
 	p->tss.back_link = 0;
-	p->tss.esp0 = PAGE_SIZE + (long) p;
-	p->tss.ss0 = 0x10;
-	p->tss.eip = eip;
+	p->tss.esp0 = PAGE_SIZE + (long) p;//esp0是内核栈指针
+	p->tss.ss0 = 0x10; //0x10就是10000，0特权级，GDT，数据段
+	p->tss.eip = eip; //重要！就是参数的EIP，是int 0x80压栈的，指向的是 int 0x80 的下一行：if(__res >= 0)
 	p->tss.eflags = eflags;
-	p->tss.eax = 0;
+	p->tss.eax = 0;   //重要！决定main()函数中if (!fork())后面的分支走向 --> 所有的父进程创建子进程都是这样
 	p->tss.ecx = ecx;
 	p->tss.edx = edx;
 	p->tss.ebx = ebx;

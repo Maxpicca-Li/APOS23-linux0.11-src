@@ -60,6 +60,7 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,}; // 物理地址空间，�
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
  */
+// TODO lyq: review the code --> memmap 从高往低找，内存顶头16MB的往低看，0特权，物理页
 unsigned long get_free_page(void)
 {
 register unsigned long __res asm("ax");
@@ -155,15 +156,21 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long * from_dir, * to_dir;
 	unsigned long nr;
 
+	// 20+2 = 22, 4MB地址空间的最后一个地址，这个大小刚好是页目录表的一个表项的管辖范围 / 一张页表的管辖范围
+	// 保证 from/to 的低 22 位全为 0, 即保证地址 4MB 对齐 --> CPU 要求分页对齐
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
-	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
+	// 获取页目录地址 0xffc, 0b1111-1111-1100，即抹掉这12位的低2位，因为一个页目录表项是4B，故这里的 from_dir 表示页目录表项的位置
+	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0, pg dir base 为 0*/
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
+	// TODO
 	size = ((unsigned) (size+0x3fffff)) >> 22;
 	for( ; size-->0 ; from_dir++,to_dir++) {
-		if (1 & *to_dir)
+		// 判断 to_dir 的低 1 位，该位表示存在位 valid
+		if (1 & *to_dir) // to_dir 存在
 			panic("copy_page_tables: already exist");
-		if (!(1 & *from_dir))
+		// 判断父进程是否给自己分配内存
+		if (!(1 & *from_dir)) // from_dir 不存在
 			continue;
 		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
 		if (!(to_page_table = (unsigned long *) get_free_page()))

@@ -61,6 +61,7 @@ static union task_union init_task = {INIT_TASK,};
 
 long volatile jiffies=0;
 long startup_time=0;
+// 所以 *current 指的进程0的task_struct
 struct task_struct *current = &(init_task.task);
 struct task_struct *last_task_used_math = NULL;
 
