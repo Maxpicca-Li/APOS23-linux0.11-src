@@ -205,6 +205,8 @@ setup_paging:
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
 	cld;rep;stosl           # FIXME lyq: 调整方向
 	# 7=0b111, 用于设置页属性, |...|1|1|1| ==> |...|特权|可读写|存在性| 
+	# 因为之后会和进程 0 共享，所以特权设置为 user
+	# 全部是恒等映射，进行分页
     movl $pg0+7,_pg_dir		/* set present bit/user r/w */
 	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
@@ -237,7 +239,7 @@ gdt_descr:
 _idt:	.fill 256,8,0		# idt is uninitialized
 
 _gdt:	.quad 0x0000000000000000	/* NULL descriptor */
-	.quad 0x00c09a0000000fff	/* 16Mb 内核代码段, 段选择子 0x8 */
-	.quad 0x00c0920000000fff	/* 16Mb 内核数据段, 段选择子 0x10 */
+	.quad 0x00c09a0000000fff	/* 16Mb 内核代码段, 段选择子 0x8 , 基址0x00000000,限长 0fff 即1000，即 16MB */
+	.quad 0x00c0920000000fff	/* 16Mb 内核数据段, 段选择子 0x10, 基址0x00000000,限长 0fff 即1000，即 16MB */
 	.quad 0x0000000000000000	/* TEMPORARY - don't use 用于隔离 LDT 和 TSS */
 	.fill 252,8,0			/* space for LDT's and TSS's etc */

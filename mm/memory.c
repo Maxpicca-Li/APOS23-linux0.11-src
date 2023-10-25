@@ -148,6 +148,7 @@ int free_page_tables(unsigned long from,unsigned long size)
  * 1 Mb-range, so the pages can be shared with the kernel. Thus the
  * special case for nr=xxxx.
  */
+// NOTE lyq: 必考题
 int copy_page_tables(unsigned long from,unsigned long to,long size)
 {
 	unsigned long * from_page_table;
@@ -163,34 +164,39 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	// 获取页目录地址 0xffc, 0b1111-1111-1100，即抹掉这12位的低2位，因为一个页目录表项是4B，故这里的 from_dir 表示页目录表项的位置
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0, pg dir base 为 0*/
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
-	// TODO
+	// size + 0x3fffff 向上取整； >> 22 得到 size 需要分配多少个页表项，不满一个页表项，按1个页表项算
 	size = ((unsigned) (size+0x3fffff)) >> 22;
 	for( ; size-->0 ; from_dir++,to_dir++) {
 		// 判断 to_dir 的低 1 位，该位表示存在位 valid
-		if (1 & *to_dir) // to_dir 存在
+		if (1 & *to_dir) // to_dir 存在，但这时不应该存在，因为子项还没有分配
 			panic("copy_page_tables: already exist");
 		// 判断父进程是否给自己分配内存
 		if (!(1 & *from_dir)) // from_dir 不存在
 			continue;
+		// 赋值父进程表项
 		from_page_table = (unsigned long *) (0xfffff000 & *from_dir);
+		// get_free_page，申请页，用于存放页表
 		if (!(to_page_table = (unsigned long *) get_free_page()))
 			return -1;	/* Out of memory, see freeing */
-		*to_dir = ((unsigned long) to_page_table) | 7;
-		nr = (from==0)?0xA0:1024;
+		*to_dir = ((unsigned long) to_page_table) | 7;  // 7 (user/rw/存在) 确定权限
+		nr = (from==0)?0xA0:1024; // 如果基址为0，则分配 160项，640KB；如果不是，则分配 1024项，4 MB
+		// 循环空间：每一个 page 4KB 的拷贝
 		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
-			this_page = *from_page_table;
-			if (!(1 & this_page))
+			this_page = *from_page_table; // 赋值父进程的页
+			if (!(1 & this_page)) // 存在则拷贝
 				continue;
-			this_page &= ~2;
-			*to_page_table = this_page;
-			if (this_page > LOW_MEM) {
-				*from_page_table = this_page;
+			// 因为所有的共享，非数据所有者，只有只读权限。如果要写，就只能 copy on write,写时复制 COW
+			this_page &= ~2; // 除了010即第二位，其他全部保留, 即 this page 只读
+			*to_page_table = this_page; // 赋值给子进程
+			if (this_page > LOW_MEM) { // 如果是扩展内存，则 mem_map 的引用计数+1
+				*from_page_table = this_page; // TODO lyq: why?
 				this_page -= LOW_MEM;
 				this_page >>= 12;
 				mem_map[this_page]++;
 			}
 		}
 	}
+	// 刷新 CR3 页目录项寄存器--> 刷新TLB
 	invalidate();
 	return 0;
 }

@@ -86,7 +86,7 @@ int copy_process(
 	if (!p) // 结果检测
 		return -EAGAIN;
 	task[nr] = p;
-	// 复制进程 0 的 task_struct 内容，此时 ldt & tss 也一样，为后面的 copy and write 做了准备 -> 开始的时候共享，当子进程write的时候，才开始加载
+	// 复制进程 0 的 task_struct 内容，此时 ldt & tss 也一样，为后面的 copy on write 做了准备 -> 开始的时候共享，当子进程write的时候，才开始加载
 	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
 	p->state = TASK_UNINTERRUPTIBLE; // 只有内核代码中明确表示将该进程设置为就绪状态才能被唤醒; 除此之外，没有任何办法将其唤醒
 	// 进程自定义设置

@@ -114,7 +114,7 @@ struct task_struct {
  *  -> 源于 Unix 的进程创建原则，即父进程创建子进程 -> 保证操作系统的绝对管理地位
  *  -> 道生一，一生二，二生三，三生万物
  * 面向对象 -> 模子原则，即类型创建对象
- * // FIXME lyq: {0x9f,0xc0fa00} 高 0x00c0fa00, 低 0x0000009f, base = 0x0000-0000，limit = 009f , 大小 limit+1 = 0xA0 = 160
+ * // {0x9f,0xc0fa00} 高 0x00c0fa00, 低 0x0000009f, base = 0x0000-0000，limit = 009f , 大小 limit+1 = 0xA0 = 160, 160*4KB
  * 
  */
 #define INIT_TASK \
