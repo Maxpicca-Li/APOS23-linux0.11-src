@@ -179,19 +179,19 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 		if (!(to_page_table = (unsigned long *) get_free_page()))
 			return -1;	/* Out of memory, see freeing */
 		*to_dir = ((unsigned long) to_page_table) | 7;  // 7 (user/rw/存在) 确定权限
-		nr = (from==0)?0xA0:1024; // 如果基址为0，则分配 160项，640KB；如果不是，则分配 1024项，4 MB
+		nr = (from==0)?0xA0:1024; // 如果为进程0，则分配 160项，640KB；如果不是，则分配 1024项，4 MB --> 因为进程0限长 160；不是的话，就会把一整张页表都给子进程
 		// 循环空间：每一个 page 4KB 的拷贝
 		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
 			this_page = *from_page_table; // 赋值父进程的页
 			if (!(1 & this_page)) // 存在则拷贝
 				continue;
 			// 因为所有的共享，非数据所有者，只有只读权限。如果要写，就只能 copy on write,写时复制 COW
-			this_page &= ~2; // 除了010即第二位，其他全部保留, 即 this page 只读
-			*to_page_table = this_page; // 赋值给子进程
-			if (this_page > LOW_MEM) { // 如果是扩展内存，则 mem_map 的引用计数+1
-				*from_page_table = this_page; // TODO lyq: why?
-				this_page -= LOW_MEM;
-				this_page >>= 12;
+			this_page &= ~2;                        // 除了010即第二位，其他全部保留, 即 this page 只读
+			*to_page_table = this_page;             // 赋值给子进程
+			if (this_page > LOW_MEM) {              // 如果 this_page < LOW_MEM, 即1MB以内的内存，不参与用户管理
+				*from_page_table = this_page;       // 对于共享的内存，无论是父进程还是子进程，都不再拥有写权限（要不然父进程写了，会改变子进程的数据）
+				this_page -= LOW_MEM;               // 从 LOW_MEM 开始算起，即从 1MB 以外的内存从0开始计数
+				this_page >>= 12;                   // mem_map，以页为单位，所以 >>=12
 				mem_map[this_page]++;
 			}
 		}
