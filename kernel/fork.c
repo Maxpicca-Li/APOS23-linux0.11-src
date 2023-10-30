@@ -92,7 +92,7 @@ int copy_process(
 	// 进程自定义设置
 	p->pid = last_pid;
 	p->father = current->pid;
-	p->counter = p->priority;
+	p->counter = p->priority;       // 避免进程0复制过来的 counter 用完了
 	p->signal = 0;
 	p->alarm = 0;
 	p->leader = 0;		/* process leadership doesn't inherit */
@@ -102,9 +102,9 @@ int copy_process(
 	p->tss.back_link = 0;
 	p->tss.esp0 = PAGE_SIZE + (long) p;//esp0是内核栈指针
 	p->tss.ss0 = 0x10; //0x10就是10000，0特权级，GDT，数据段
-	p->tss.eip = eip; //重要！就是参数的EIP，是int 0x80压栈的，指向的是 int 0x80 的下一行：if(__res >= 0)
+	p->tss.eip = eip; //重要！就是参数的EIP，是int 0x80压栈的，指向的是 include/unistd.h 中 int 0x80 的下一行：if(__res >= 0)
 	p->tss.eflags = eflags;
-	p->tss.eax = 0;   //重要！决定main()函数中if (!fork())后面的分支走向 --> 所有的父进程创建子进程都是这样
+	p->tss.eax = 0;   //重要！决定main()函数中if (!fork())后面的分支走向 --> 所有的父进程创建子进程都是这样，到时候int 0x80 返回的值为0
 	p->tss.ecx = ecx;
 	p->tss.edx = edx;
 	p->tss.ebx = ebx;
@@ -127,20 +127,20 @@ int copy_process(
 		free_page((long) p);
 		return -EAGAIN;
 	}
-	for (i=0; i<NR_OPEN;i++)
+	for (i=0; i<NR_OPEN;i++)        // 调整打开的文件数量
 		if (f=p->filp[i])
 			f->f_count++;
 	if (current->pwd)
-		current->pwd->i_count++;
+		current->pwd->i_count++;    // 指向当前进程的指针
 	if (current->root)
 		current->root->i_count++;
 	if (current->executable)
 		current->executable->i_count++;
-	// 每次新建进程，都会设置 tss & ldt
+	// 每次新建进程，都会设置 tss & ldt，进程 0 的在 sched_init 中进行初始化
 	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
 	set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
-	p->state = TASK_RUNNING;	/* do this last, just in case */
-	return last_pid;
+    p->state = TASK_RUNNING;	/* do this last, just in case, 进程1处于就绪态*/
+	return last_pid;    // 1，在下面的 find_empty_process 中进行设置, 这里表示活干完了，可以开始 run proc 1 了
 }
 
 int find_empty_process(void)
@@ -159,6 +159,6 @@ int find_empty_process(void)
 	// 找空闲的 task
 	for(i=1 ; i<NR_TASKS ; i++)
 		if (!task[i])
-			return i;
+			return i;       // 表示这个空位可以放置进程
 	return -EAGAIN;
 }

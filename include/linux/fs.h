@@ -81,7 +81,7 @@ struct buffer_head {
 	struct buffer_head * b_next_free;
 };
 
-struct d_inode {
+struct d_inode {    // disk i 节点
 	unsigned short i_mode;
 	unsigned short i_uid;
 	unsigned long i_size;
@@ -91,7 +91,7 @@ struct d_inode {
 	unsigned short i_zone[9];
 };
 
-struct m_inode {
+struct m_inode {    // memory i 节点
 	unsigned short i_mode;
 	unsigned short i_uid;
 	unsigned long i_size;
@@ -114,7 +114,7 @@ struct m_inode {
 	unsigned char i_update;
 };
 
-struct file {
+struct file {   // 一个文件一个 i 节点，一套在硬盘上，一套在内存中，内存的相比硬盘的多一些
 	unsigned short f_mode;
 	unsigned short f_flags;
 	unsigned short f_count;

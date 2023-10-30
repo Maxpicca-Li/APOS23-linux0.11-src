@@ -75,7 +75,7 @@ bad_sys_call:
 	iret
 .align 2
 reschedule:
-	pushl $ret_from_sys_call
+	pushl $ret_from_sys_call    # 到时候从 _schedule 返回的时候，就直接执行 ret_from_sys_call
 	jmp _schedule
 .align 2
 _system_call:
@@ -86,24 +86,24 @@ _system_call:
 	push %es
 	push %fs
 	pushl %edx
-	pushl %ecx		# push %ebx,%ecx,%edx as parameters
-	pushl %ebx		# to the system call
-	movl $0x10,%edx		# set up ds,es to kernel space $0x10 为内核数据段
+	pushl %ecx              # push %ebx,%ecx,%edx as parameters
+	pushl %ebx              # to the system call
+	movl $0x10,%edx         # set up ds,es to kernel space $0x10 为内核数据段
 	mov %dx,%ds
 	mov %dx,%es
-	movl $0x17,%edx		# fs points to local data space
+	movl $0x17,%edx         # fs points to local data space
 	mov %dx,%fs
 	# _sys_call_table + %eax * 4, 为 _sys_call_table[%eax] 的物理地址
 	call _sys_call_table(,%eax,4)
-	pushl %eax
-	movl _current,%eax
-	cmpl $0,state(%eax)		# state
-	jne reschedule
-	cmpl $0,counter(%eax)		# counter
-	je reschedule
-ret_from_sys_call:
+	pushl %eax              # 这里是 sys_fork 中的返回值，此时 eax 是 sys_fork 中调用的 copy_process 中返回的 last_pid
+	movl _current,%eax      # _current 进程 0
+	cmpl $0,state(%eax)     # 即进程 0 的 task_struct state，0 就绪态
+	jne reschedule          # 如果进程 0 未就绪，则进入「进程调度过程」
+	cmpl $0,counter(%eax)   # counter，即进程 0 的时间片
+	je reschedule           # 如果进程 0 时间片为0，即到时间了，则进入「进程调度过程」
+ret_from_sys_call:          # 返回 sys_call
 	movl _current,%eax		# task[0] cannot have signals
-	cmpl _task,%eax
+	cmpl _task,%eax         # task 数组首地址，即进程0 --> 判断 _current 是否是进程0
 	je 3f
 	cmpw $0x0f,CS(%esp)		# was old code segment supervisor ?
 	jne 3f
@@ -121,14 +121,14 @@ ret_from_sys_call:
 	pushl %ecx
 	call _do_signal
 	popl %eax
-3:	popl %eax
+3:	popl %eax               # system_call 之前压的栈，popl 4字节，pop 2字节
 	popl %ebx
 	popl %ecx
 	popl %edx
 	pop %fs
 	pop %es
 	pop %ds
-	iret
+	iret                    # int80 iret，涉及到特权级转换 0->3
 
 .align 2
 _coprocessor_error:
@@ -210,7 +210,7 @@ _sys_execve:
 .align 2
 _sys_fork:
 	call _find_empty_process
-	# 这个啥意思
+	# FIXME lyq: 这个啥意思
 	testl %eax,%eax
 	js 1f
 	push %gs
@@ -219,8 +219,8 @@ _sys_fork:
 	pushl %ebp
 	pushl %eax
 	call _copy_process
-	addl $20,%esp
-1:	ret
+	addl $20,%esp   // 加清栈，减压栈：20 = 4 * 5，5个数，把前面的 gs, esi, edi, ebp, eax丢弃掉，注意 gs 是 2 字节，但是".align 2"会让 gs 对齐增2字节，故总共20字节
+1:	ret             // 普通的 ret，而不是 iret，因为没有翻转特权级, 0->0
 
 _hd_interrupt:
 	pushl %eax

@@ -141,11 +141,11 @@ int $0x80: 	系统调用, __NR_fork = 2
 type name(void) \
 { \
 long __res; \
-__asm__ volatile ("int $0x80" \
+__asm__ volatile ("int $0x80" /* int $0x80 调用 _system_call */\
 	: "=a" (__res) \
 	: "0" (__NR_##name)); \
-/* int $0x80 压栈时的 eip */if (__res >= 0) \
-	return (type) __res; \
+if (__res >= 0) /* int $0x80 压栈时的 eip; _res 为0，见kernel/fork.c line107: `p->tss.eax = 0;` 故最后返回0*/\
+	return (type) __res; /* 返回到 main.fork */\
 errno = -__res; \
 return -1; \
 }

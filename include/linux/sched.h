@@ -100,7 +100,7 @@ struct task_struct {
 	struct m_inode * root;
 	struct m_inode * executable;
 	unsigned long close_on_exec;
-	struct file * filp[NR_OPEN];
+	struct file * filp[NR_OPEN];                // 最多打开 20 个文件
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
 	struct desc_struct ldt[3];
 /* tss for this task */
@@ -176,18 +176,19 @@ __asm__("str %%ax\n\t" \
  * This also clears the TS-flag if the task we switched to has used
  * tha math co-processor latest.
  */
+// TODO lyq: 进程切换，类似于任务门切换，tss 段的切换
 #define switch_to(n) {\
 struct {long a,b;} __tmp; \
 __asm__("cmpl %%ecx,_current\n\t" \
 	"je 1f\n\t" \
 	"movw %%dx,%1\n\t" \
 	"xchgl %%ecx,_current\n\t" \
-	"ljmp %0\n\t" \
+	"ljmp %0\n\t" /* long jmp %0,即参数中的段选择子，即先保存下条指令地址即eip+4到进程0的tss，恢复进程1的所有 tss 数据，无需偏移量。在此之前是进程0的内核态，在此之后是进程1的内核态。下列代码不执行，此时 sys pause->schedule->switch_to，还没有清栈，待到切换回进程0是，基于保存的 eip 调用下列代码，返回所有函数并清栈*/\
 	"cmpl %%ecx,_last_task_used_math\n\t" \
 	"jne 1f\n\t" \
 	"clts\n" \
 	"1:" \
-	::"m" (*&__tmp.a),"m" (*&__tmp.b), \
+	::"m" (*&__tmp.a),"m" (*&__tmp.b), /* 前者是段选择子，后者是偏移量，这里只用了前者 */\
 	"d" (_TSS(n)),"c" ((long) task[n])); \
 }
 

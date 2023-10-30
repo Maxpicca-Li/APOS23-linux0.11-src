@@ -56,7 +56,7 @@ union task_union {
 	char stack[PAGE_SIZE];   // 内核栈，精心测算，内核代码压栈绝对不会覆盖 task_struct
 };
 
-// 静态全局变量，static 赋予内部链接，即其只能在定义它的源文件中访问
+// NOTE lyq:静态全局变量，static 赋予内部链接，即其只能在定义它的源文件中访问
 static union task_union init_task = {INIT_TASK,};
 
 long volatile jiffies=0;
@@ -104,11 +104,12 @@ void math_state_restore()
  *   NOTE!!  Task 0 is the 'idle' task, which gets called when no other
  * tasks can run. It can not be killed, and it cannot sleep. The 'state'
  * information in task[0] is never used.
+ *   NOTE lyq: 进程调度，启动！
  */
 void schedule(void)
 {
 	int i,next,c;
-	struct task_struct ** p;
+    struct task_struct ** p;    // 指向指针的指针
 
 /* check alarm, wake up any interruptible tasks that have got a signal */
 
@@ -126,28 +127,28 @@ void schedule(void)
 /* this is the scheduler proper: */
 
 	while (1) {
-		c = -1;
-		next = 0;
-		i = NR_TASKS;
+		c = -1;                 // c = 0xFFFFFFFF
+		next = 0;               // 指向下一个进程
+		i = NR_TASKS;           // i = 64
 		p = &task[NR_TASKS];
-		while (--i) {
+		while (--i) {           // 高往低遍历；找就绪态，时间片最多的
 			if (!*--p)
 				continue;
 			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
 				c = (*p)->counter, next = i;
 		}
-		if (c) break;
-		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
-			if (*p)
+		if (c) break;           // 如果一个都没找到，c 还是 -1，next 为 0，break 切换到0
+		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) // 高往低遍历
+			if (*p)             // 优先级设置：该系统不单列优先级，折成时间片
 				(*p)->counter = ((*p)->counter >> 1) +
 						(*p)->priority;
 	}
-	switch_to(next);
+	switch_to(next); // 找到进程后进行切换
 }
 
-int sys_pause(void)
+int sys_pause(void)     // 做进程调度，目前是 current 进程的内核态在跑
 {
-	current->state = TASK_INTERRUPTIBLE;
+	current->state = TASK_INTERRUPTIBLE;    // 目前可能是进程 0（如果创建进程1的时候，进程0没有state/counter，就会被调度走）
 	schedule();
 	return 0;
 }
