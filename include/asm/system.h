@@ -2,16 +2,16 @@
 /*
 eax=esp
 这里的 %%esp 是 0、3 特权共用的栈，iret前是0特权的，iret后是3特权的，为进程0的用户栈。
-push 5个值到 user_stack，模拟了3特权级的中断压栈过程
+push 5个值到 user_stack，模拟了3特权级的中断压栈过程。进程0和内核的段基址一致，所以这里的 push 最后 iret 后就进入进程0了
 	ss:     0x17 = 0b10|1|11 = 数据段|ldt|3特权级，对应 ss，stack segment
-	esp:    esp，之前eax=esp，已经赋值了
+	esp:    esp，之前eax=esp，已经赋值了（如果不提前存下 esp 的值，esp会随着 push 逐步减）
 	eflags: pushfl
 	cs:     0x0f = 0b 1|1|11 = 代码段|ldt|3特权级，对应 cs，code segment
 	eip:    $1f: 1 forward，前面的1 label，相当于 eip（$1b: 1back，后面的1 label）
 iret 中断返回，和 main 函数手法类似
 	函数调用：时间已知，由编译器进行压栈
 	中断调用：时间未知，由硬件机制进行压栈，压的内容由ISA决定
-    此后，进程0开始执行
+    此后，进程0开始执行，特权级 0->3
 1: return 的地址，即之前 pushl $1f（eip）。这里进程0的代码开始对齐特权级
     eax = 0x17
     ds = ax

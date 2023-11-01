@@ -182,8 +182,8 @@ struct {long a,b;} __tmp; \
 __asm__("cmpl %%ecx,_current\n\t" \
 	"je 1f\n\t" \
 	"movw %%dx,%1\n\t" \
-	"xchgl %%ecx,_current\n\t" \
-	"ljmp %0\n\t" /* long jmp %0,即参数中的段选择子，即先保存下条指令地址即eip+4到进程0的tss，恢复进程1的所有 tss 数据，无需偏移量。在此之前是进程0的内核态，在此之后是进程1的内核态。下列代码不执行，此时 sys pause->schedule->switch_to，还没有清栈，待到切换回进程0是，基于保存的 eip 调用下列代码，返回所有函数并清栈*/\
+	"xchgl %%ecx,_current\n\t" /* _current 和 %%ecx 交换 */\
+	"ljmp %0\n\t" /* long jmp %0,即参数中的段选择子，即先保存下条指令地址即eip+4到进程0的tss，恢复进程1的所有 tss 数据，无需偏移量。在此之前是进程0的内核态，在此之后是进程1的用户态。下列代码不执行，此时 sys pause->schedule->switch_to，还没有清栈，待到切换回进程0时，基于保存的 eip 调用下列代码，返回所有函数并清栈*/\
 	"cmpl %%ecx,_last_task_used_math\n\t" \
 	"jne 1f\n\t" \
 	"clts\n" \

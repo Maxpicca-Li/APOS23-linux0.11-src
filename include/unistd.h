@@ -144,7 +144,7 @@ long __res; \
 __asm__ volatile ("int $0x80" /* int $0x80 调用 _system_call */\
 	: "=a" (__res) \
 	: "0" (__NR_##name)); \
-if (__res >= 0) /* int $0x80 压栈时的 eip; _res 为0，见kernel/fork.c line107: `p->tss.eax = 0;` 故最后返回0*/\
+if (__res >= 0) /* int $0x80 压栈时的 eip; 跳转到进程1时，经过这里的 _res 为0，见kernel/fork.c line107: `p->tss.eax = 0;` 故最后返回0*/\
 	return (type) __res; /* 返回到 main.fork */\
 errno = -__res; \
 return -1; \
