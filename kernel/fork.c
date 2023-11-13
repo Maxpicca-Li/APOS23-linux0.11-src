@@ -104,11 +104,11 @@ int copy_process(
 	p->tss.ss0 = 0x10; //0x10就是10000，0特权级，GDT，数据段
 	p->tss.eip = eip; //重要！就是参数的EIP，是int 0x80压栈的，指向的是 include/unistd.h 中 int 0x80 的下一行：if(__res >= 0)
 	p->tss.eflags = eflags;
-	p->tss.eax = 0;   //重要！设置为常数0，决定main()函数中if (!fork())后面的分支走向 --> 所有的父进程创建子进程都是这样，到时候int 0x80 返回的值为0
+	p->tss.eax = 0;   //重要！设置为常数0，决定main()函数中if (!fork())后面的分支走向 --> 所有的父进程创建子进程都是这样，到时候int 0x80 返回的值为0，然后进入到 init 中，即是说每个进程创建后，第一次被调用时，都会进入 init 执行
 	p->tss.ecx = ecx;
 	p->tss.edx = edx;
 	p->tss.ebx = ebx;
-	p->tss.esp = esp;
+	p->tss.esp = esp; //重要！
 	p->tss.ebp = ebp;
 	p->tss.esi = esi;
 	p->tss.edi = edi;

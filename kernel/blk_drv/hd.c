@@ -70,6 +70,7 @@ extern void rd_load(void);
 /* This may be used only once, enforced by 'static int callable' */
 int sys_setup(void * BIOS)
 {
+	// 硬盘设置
 	static int callable = 1;
 	int i,drive;
 	unsigned char cmos_disks;

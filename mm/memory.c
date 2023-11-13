@@ -148,7 +148,7 @@ int free_page_tables(unsigned long from,unsigned long size)
  * 1 Mb-range, so the pages can be shared with the kernel. Thus the
  * special case for nr=xxxx.
  */
-// NOTE lyq: 必考题
+// NOTE lyq: 必考题，复制页表
 int copy_page_tables(unsigned long from,unsigned long to,long size)
 {
 	unsigned long * from_page_table;
@@ -166,6 +166,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
 	// size + 0x3fffff 向上取整； >> 22 得到 size 需要分配多少个页表项，不满一个页表项，按1个页表项算
 	size = ((unsigned) (size+0x3fffff)) >> 22;
+	/* 页表项 */
 	for( ; size-->0 ; from_dir++,to_dir++) {
 		// 判断 to_dir 的低 1 位，该位表示存在位 valid
 		if (1 & *to_dir) // to_dir 存在，但这时不应该存在，因为子项还没有分配
@@ -180,7 +181,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 			return -1;	/* Out of memory, see freeing */
 		*to_dir = ((unsigned long) to_page_table) | 7;  // 7 (user/rw/存在) 确定权限
 		nr = (from==0)?0xA0:1024; // 如果为进程0，则分配 160项，640KB；如果不是，则分配 1024项，4 MB --> 因为进程0限长 160；不是的话，就会把一整张页表都给子进程
-		// 循环空间：每一个 page 4KB 的拷贝
+		/* 页表：循环空间：每一个页表 4KB 的地址拷贝 */
 		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
 			this_page = *from_page_table; // 赋值父进程的页
 			if (!(1 & this_page)) // 存在则拷贝
@@ -188,6 +189,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 			// 因为所有的共享，非数据所有者，只有只读权限。如果要写，就只能 copy on write,写时复制 COW
 			this_page &= ~2;                        // 除了010即第二位，其他全部保留, 即 this page 只读
 			*to_page_table = this_page;             // 赋值给子进程
+			// NOTE lyq: 这里进程 0 page 640KB，没有到 1MB，所以进程 0 不会进入 if 内部，仍然拥有写权限。
 			if (this_page > LOW_MEM) {              // 如果 this_page < LOW_MEM, 即1MB以内的内存，不参与用户管理
 				*from_page_table = this_page;       // 对于共享的内存，无论是父进程还是子进程，都不再拥有写权限（要不然父进程写了，会改变子进程的数据）
 				this_page -= LOW_MEM;               // 从 LOW_MEM 开始算起，即从 1MB 以外的内存从0开始计数

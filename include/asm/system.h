@@ -70,6 +70,7 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 	"d" ((char *) (addr)),"a" (0x00080000))
 // (char *) 指针也有类型，当时只找到字节指针，所以用的char *，但是后来用 (void *) 来代表指针类型
 
+// TODO lyq: 这里门设置的含义是什么？
 // 中断门：硬件或软件异常/中断
 #define set_intr_gate(n,addr) \
 	_set_gate(&idt[n],14,0,addr)

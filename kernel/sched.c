@@ -146,7 +146,7 @@ void schedule(void)
 	switch_to(next); // 找到进程后进行切换
 }
 
-int sys_pause(void)     // 做进程调度，目前是 current 进程的内核态在跑
+int sys_pause(void)     // 做进程调度，目前是**current 进程的内核态**在跑
 {
 	current->state = TASK_INTERRUPTIBLE;    // 目前可能是进程 0（如果创建进程1的时候，进程0没有state/counter，就会被调度走）
 	schedule();
@@ -336,7 +336,7 @@ void do_timer(long cpl)
 		do_floppy_timer();
 	if ((--current->counter)>0) return;
 	current->counter=0;
-	if (!cpl) return;
+	if (!cpl) return; // current privilege level
 	schedule();
 }
 
