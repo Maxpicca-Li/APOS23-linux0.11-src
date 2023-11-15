@@ -128,7 +128,7 @@ void check_disk_change(int dev)
 	invalidate_buffers(dev);
 }
 
-#define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH)
+#define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH) // 哈希函数
 #define hash(dev,block) hash_table[_hashfn(dev,block)]
 
 static inline void remove_from_queues(struct buffer_head * bh)
@@ -171,7 +171,7 @@ static struct buffer_head * find_buffer(int dev, int block)
 	struct buffer_head * tmp;
 
 	for (tmp = hash(dev,block) ; tmp != NULL ; tmp = tmp->b_next)
-		if (tmp->b_dev==dev && tmp->b_blocknr==block)
+		if (tmp->b_dev==dev && tmp->b_blocknr==block) // 查找缓冲区中是否有指定设备号、块号的缓冲块。如果能找到指定缓冲块，就直接用。
 			return tmp;
 	return NULL;
 }
@@ -190,7 +190,7 @@ struct buffer_head * get_hash_table(int dev, int block)
 	for (;;) {
 		if (!(bh=find_buffer(dev,block)))
 			return NULL;
-		bh->b_count++;
+		bh->b_count++; // 引用计数
 		wait_on_buffer(bh);
 		if (bh->b_dev == dev && bh->b_blocknr == block)
 			return bh;
@@ -205,18 +205,19 @@ struct buffer_head * get_hash_table(int dev, int block)
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
  */
-#define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
+#define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock) // dirty 的权重更大，更 Bad
 struct buffer_head * getblk(int dev,int block)
 {
 	struct buffer_head * tmp, * bh;
 
 repeat:
-	if (bh = get_hash_table(dev,block))
+	if (bh = get_hash_table(dev,block)) // 先找现有的：查找哈希表，检索此前是否有程序把现在要读的硬盘逻辑块（相同的设备号和块号）已经读到缓冲区
 		return bh;
 	tmp = free_list;
 	do {
-		if (tmp->b_count)
+		if (tmp->b_count) // 找 count 为 0 的
 			continue;
+		// dirty + lock时，优先选择只有 lock，因为 lock 是指 queue 正在操作，等待的时间更短；dirty还不知道什么时候操作 
 		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
 			bh = tmp;
 			if (!BADNESS(tmp))
@@ -228,7 +229,7 @@ repeat:
 		sleep_on(&buffer_wait);
 		goto repeat;
 	}
-	wait_on_buffer(bh);
+	wait_on_buffer(bh); //请求资源中
 	if (bh->b_count)
 		goto repeat;
 	while (bh->b_dirt) {
@@ -266,13 +267,14 @@ void brelse(struct buffer_head * buf)
 /*
  * bread() reads a specified block and returns the buffer that contains
  * it. It returns NULL if the block was unreadable.
+ * 读指定 dev, block, 第一块硬盘的 dev 是 0x300, block 是 0
  */
-struct buffer_head * bread(int dev,int block)
+struct buffer_head * bread(int dev,int block) //返回 buffer head
 {
 	struct buffer_head * bh;
 
-	if (!(bh=getblk(dev,block)))
-		panic("bread: getblk returned NULL\n");
+	if (!(bh=getblk(dev,block))) // 在缓冲区中得到与 dev, block 相符合或空闲的缓冲块
+		panic("bread: getblk returned NULL\n"); // 第一次使用缓冲区，不可能没有空闲块
 	if (bh->b_uptodate)
 		return bh;
 	ll_rw_block(READ,bh);

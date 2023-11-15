@@ -77,27 +77,27 @@ int sys_setup(void * BIOS)
 	struct partition *p;
 	struct buffer_head * bh;
 
-	if (!callable)
+	if (!callable) // 控制只调用一次
 		return -1;
 	callable = 0;
 #ifndef HD_TYPE
-	for (drive=0 ; drive<2 ; drive++) {
-		hd_info[drive].cyl = *(unsigned short *) BIOS;
-		hd_info[drive].head = *(unsigned char *) (2+BIOS);
+	for (drive=0 ; drive<2 ; drive++) { // 读取 drive_info，设置 hd_info, BIOS 就是 drive_info
+		hd_info[drive].cyl = *(unsigned short *) BIOS; // 柱面数
+		hd_info[drive].head = *(unsigned char *) (2+BIOS); // 磁头数
 		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS);
 		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
 		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
-		hd_info[drive].sect = *(unsigned char *) (14+BIOS);
+		hd_info[drive].sect = *(unsigned char *) (14+BIOS); // 每磁道扇区数
 		BIOS += 16;
 	}
-	if (hd_info[1].cyl)
+	if (hd_info[1].cyl) // 判断有几个磁盘 --> TODO lyq: 如何根据柱面数判断磁盘数
 		NR_HD=2;
 	else
 		NR_HD=1;
 #endif
-	for (i=0 ; i<NR_HD ; i++) {
+	for (i=0 ; i<NR_HD ; i++) { //一个物理硬盘最多可以分4个逻辑盘，0是物理盘，1～4是逻辑盘，共5个，第1个物理盘是0*5，第2个物理盘是1*5
 		hd[i*5].start_sect = 0;
-		hd[i*5].nr_sects = hd_info[i].head*
+		hd[i*5].nr_sects = hd_info[i].head* // 扇区数
 				hd_info[i].sect*hd_info[i].cyl;
 	}
 
@@ -134,8 +134,8 @@ int sys_setup(void * BIOS)
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = 0;
 	}
-	for (drive=0 ; drive<NR_HD ; drive++) {
-		if (!(bh = bread(0x300 + drive*5,0))) {
+	for (drive=0 ; drive<NR_HD ; drive++) { //第1个物理盘设备号是0x300，第2个是0x305，读每个物理硬盘的0号块，即引导块，有分区信息
+		if (!(bh = bread(0x300 + drive*5,0))) { // bread: block read
 			printk("Unable to read partition table of drive %d\n\r",
 				drive);
 			panic("");

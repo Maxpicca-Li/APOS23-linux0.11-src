@@ -66,18 +66,18 @@ __asm__("incl %0\n\tandl $4095,%0"::"m" (head))
 typedef char buffer_block[BLOCK_SIZE];
 
 // 双向环链表+交叉链表
-struct buffer_head {
+struct buffer_head { // 缓冲块的管理信息
 	char * b_data;			/* pointer to data block (1024 bytes) */
 	unsigned long b_blocknr;	/* block number */
-	unsigned short b_dev;		/* device (0 = free) */
-	unsigned char b_uptodate;
-	unsigned char b_dirt;		/* 0-clean,1-dirty */
-	unsigned char b_count;		/* users using this block */
-	unsigned char b_lock;		/* 0 - ok, 1 -locked */
-	struct task_struct * b_wait;
-	struct buffer_head * b_prev;
+	unsigned short b_dev;		/* device (0 = free) 数据源的设备号*/
+	unsigned char b_uptodate;   // 更新标志：表示数据是否已更新。
+	unsigned char b_dirt;		/* 0-clean,1-dirty 修改标志*/
+	unsigned char b_count;		/* users using this block 使用的用户数，引用计数，类似 mem_map*/
+	unsigned char b_lock;		/* 0 - ok, 1 -locked 防止竞争+同时修改问题 */
+	struct task_struct * b_wait; // 指向等待该缓冲区解锁的进程/任务。
+	struct buffer_head * b_prev; // hash 队列上前一块（这四个指针用于缓冲区的管理）
 	struct buffer_head * b_next;
-	struct buffer_head * b_prev_free;
+	struct buffer_head * b_prev_free; // 空闲表上前一块
 	struct buffer_head * b_next_free;
 };
 
