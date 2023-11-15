@@ -14,6 +14,7 @@
  * 32 项好象是一个合理的数字：已经足够从电梯算法中获得好处， 
  * 但当缓冲区在队列中而锁住时又不显得是很大的数。64 就看上 
  * 去太大了（当大量的写/同步操作运行时很容易引起长时间的暂停）。
+ * 2023.11.15 因为缓冲区有 3000 多缓冲块，用户到缓冲区的速度，是缓冲区到硬盘的速度的百倍（2个数量级），所以请求项（用于缓冲区向硬盘请求数据）设置为 3000/100 约 32 项来保证缓冲区数据的供应
  */
 #define NR_REQUEST	32
 
@@ -40,6 +41,7 @@ struct request {
  * This is used in the elevator algorithm: Note that
  * reads always go before writes. This is natural: reads
  * are much more time-critical than writes.
+ * 电梯算法：读优先于写，因为读比写时间更紧迫
  */
 #define IN_ORDER(s1,s2) \
 ((s1)->cmd<(s2)->cmd || (s1)->cmd==(s2)->cmd && \

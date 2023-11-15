@@ -31,15 +31,15 @@ extern int end;
 struct buffer_head * start_buffer = (struct buffer_head *) &end;
 // 本身 buffer 给了 307 项
 struct buffer_head * hash_table[NR_HASH];
-// 记录 free 的buffer
+// 记录 free 的 buffer
 static struct buffer_head * free_list;
 static struct task_struct * buffer_wait = NULL;
 int NR_BUFFERS = 0;
 
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
-	cli();
-	while (bh->b_lock)
+	cli(); // 原子操作
+	while (bh->b_lock) // NOTE lyq: 可能考：为什么这里用 while 而不是 if，因为一次 sleep_on 可能等不到解锁。
 		sleep_on(&bh->b_wait);
 	sti();
 }
@@ -131,7 +131,7 @@ void check_disk_change(int dev)
 #define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH) // 哈希函数
 #define hash(dev,block) hash_table[_hashfn(dev,block)]
 
-static inline void remove_from_queues(struct buffer_head * bh)
+static inline void remove_from_queues(struct buffer_head * bh) // TODO lyq: queue 数据结构，脱钩操作，主要是 prev 和 next 的变化
 {
 /* remove from hash-queue */
 	if (bh->b_next)
@@ -149,7 +149,7 @@ static inline void remove_from_queues(struct buffer_head * bh)
 		free_list = bh->b_next_free;
 }
 
-static inline void insert_into_queues(struct buffer_head * bh)
+static inline void insert_into_queues(struct buffer_head * bh) // TODO lyq: queue 数据结构，插入操作，主要是 prev 和 next 的变化
 {
 /* put at end of free list */
 	bh->b_next_free = free_list;
@@ -182,6 +182,7 @@ static struct buffer_head * find_buffer(int dev, int block)
  * something might happen to it while we sleep (ie a read-error
  * will force it bad). This shouldn't really happen currently, but
  * the code is ready.
+ * 只看红叉部分
  */
 struct buffer_head * get_hash_table(int dev, int block)
 {
@@ -213,18 +214,18 @@ struct buffer_head * getblk(int dev,int block)
 repeat:
 	if (bh = get_hash_table(dev,block)) // 先找现有的：查找哈希表，检索此前是否有程序把现在要读的硬盘逻辑块（相同的设备号和块号）已经读到缓冲区
 		return bh;
-	tmp = free_list;
+	tmp = free_list; // buffer_head linked list 表头
 	do {
-		if (tmp->b_count) // 找 count 为 0 的
+		if (tmp->b_count) // 找 count 为 0 的 --> 即空闲块
 			continue;
 		// dirty + lock时，优先选择只有 lock，因为 lock 是指 queue 正在操作，等待的时间更短；dirty还不知道什么时候操作 
 		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
-			bh = tmp;
+			bh = tmp; // 1. 初始化生成 // 2. 新的 freelist --> TODO: 没有挂 dev&block number，没有 count + 1，也没有按照 dev/block number 的 hash value 挂到 hash_table 上
 			if (!BADNESS(tmp))
 				break;
 		}
 /* and repeat until we find something good */
-	} while ((tmp = tmp->b_next_free) != free_list);
+	} while ((tmp = tmp->b_next_free) != free_list); // 环链表，判尾
 	if (!bh) {
 		sleep_on(&buffer_wait);
 		goto repeat;
@@ -244,13 +245,13 @@ repeat:
 		goto repeat;
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
-	bh->b_count=1;
+	bh->b_count=1; // 更新 buffer 信息
 	bh->b_dirt=0;
 	bh->b_uptodate=0;
-	remove_from_queues(bh);
+	remove_from_queues(bh); // remove from free list
 	bh->b_dev=dev;
 	bh->b_blocknr=block;
-	insert_into_queues(bh);
+	insert_into_queues(bh); // insert into hash table
 	return bh;
 }
 
@@ -274,10 +275,11 @@ struct buffer_head * bread(int dev,int block) //返回 buffer head
 	struct buffer_head * bh;
 
 	if (!(bh=getblk(dev,block))) // 在缓冲区中得到与 dev, block 相符合或空闲的缓冲块
-		panic("bread: getblk returned NULL\n"); // 第一次使用缓冲区，不可能没有空闲块
+		panic("bread: getblk returned NULL\n"); // 使用缓冲区，不可能没有空闲块，没有它会一直等着
 	if (bh->b_uptodate)
 		return bh;
-	ll_rw_block(READ,bh);
+	// ⬆ 缓冲区 || ⬇ 请求项
+	ll_rw_block(READ,bh); // low floor
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)
 		return bh;
@@ -360,7 +362,7 @@ void buffer_init(long buffer_end)
 		b = (void *) (640*1024);
 	else
 		b = (void *) buffer_end;
-	while ( (b -= BLOCK_SIZE) >= ((void *) (h+1)) ) {
+	while ( (b -= BLOCK_SIZE)  >= ((void *) (h+1)) ) {
 		h->b_dev = 0;
 		h->b_dirt = 0;
 		h->b_count = 0;

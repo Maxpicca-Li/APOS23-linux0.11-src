@@ -30,8 +30,8 @@
 
 void buffer_init(long buffer_end);
 
-#define MAJOR(a) (((unsigned)(a))>>8)
-#define MINOR(a) ((a)&0xff)
+#define MAJOR(a) (((unsigned)(a))>>8) // 低 8 位对齐并获取高位
+#define MINOR(a) ((a)&0xff) // 获取低 8 位
 
 #define NAME_LEN 14
 #define ROOT_INO 1

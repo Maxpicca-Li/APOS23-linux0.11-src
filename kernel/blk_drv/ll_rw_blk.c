@@ -29,6 +29,7 @@ struct task_struct * wait_for_request = NULL;
 /* blk_dev_struct is:
  *	do_request-address
  *	next-request
+ *  NR_BLK_DEV 0-6
  */
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL },		/* no_dev 无设备*/
@@ -73,10 +74,10 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	if (!(tmp = dev->current_request)) {
 		dev->current_request = req;
 		sti();
-		(dev->request_fn)();
+		(dev->request_fn)(); // 调用硬盘请求项处理函数，这里是 do_hd_request() 去给硬盘发送读盘命令
 		return;
 	}
-	for ( ; tmp->next ; tmp=tmp->next)
+	for ( ; tmp->next ; tmp=tmp->next) // 电梯算法的作用是让磁盘磁头的移动距离最小 --> 有点像冒泡排序
 		if ((IN_ORDER(tmp,req) ||
 		    !IN_ORDER(tmp,tmp->next)) &&
 		    IN_ORDER(req,tmp->next))
@@ -94,32 +95,32 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 /* WRITEA/READA is special case - it is not really needed, so if the */
 /* buffer is locked, we just forget about it, else it's a normal read */
 	if (rw_ahead = (rw == READA || rw == WRITEA)) {
-		if (bh->b_lock)
+		if (bh->b_lock) // bh 加了锁
 			return;
-		if (rw == READA)
+		if (rw == READA) // 放弃预读写，改为普通读写
 			rw = READ;
 		else
 			rw = WRITE;
 	}
 	if (rw!=READ && rw!=WRITE)
 		panic("Bad block dev command, must be R/W/RA/WA");
-	lock_buffer(bh);
+	lock_buffer(bh); // 先加锁，避免被挪作他用
 	if ((rw == WRITE && !bh->b_dirt) || (rw == READ && bh->b_uptodate)) {
 		unlock_buffer(bh);
 		return;
 	}
 repeat:
 /* we don't allow the write-requests to fill up the queue completely:
- * we want some room for reads: they take precedence. The last third
+ * we want some room for reads: they take precedence (n. 领先优先). The last third
  * of the requests are only for reads.
  */
 	if (rw == READ)
-		req = request+NR_REQUEST;
+		req = request+NR_REQUEST; // 读从尾端开始
 	else
-		req = request+((NR_REQUEST*2)/3);
+		req = request+((NR_REQUEST*2)/3); // 写从 2/3 处开始
 /* find an empty request */
-	while (--req >= request)
-		if (req->dev<0)
+	while (--req >= request) // 从后向前搜索空闲请求项，在 blk_dev_init 中，dev 初始化为-1，即空闲
+		if (req->dev<0) // 找到空闲请求项 kernel/blk_drv/blk.h line 27: -1 没有 request
 			break;
 /* if none found, sleep on new requests: check for rw_ahead */
 	if (req < request) {
@@ -131,25 +132,25 @@ repeat:
 		goto repeat;
 	}
 /* fill up the request-info, and add it to the queue */
-	req->dev = bh->b_dev;
+	req->dev = bh->b_dev; // 设置 dev
 	req->cmd = rw;
 	req->errors=0;
 	req->sector = bh->b_blocknr<<1;
-	req->nr_sectors = 2;
+	req->nr_sectors = 2; // 512 B * 2 = 1024 B = 1KB
 	req->buffer = bh->b_data;
 	req->waiting = NULL;
 	req->bh = bh;
 	req->next = NULL;
-	add_request(major+blk_dev,req);
+	add_request(major+blk_dev,req); // 加载请求项
 }
 
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
 
-	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
-	!(blk_dev[major].request_fn)) {
-		printk("Trying to read nonexistent block-device\n\r");
+	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV || // 低 8 位对齐并获取高位, 主设备号是 0-6，>=7意味着不存在
+	!(blk_dev[major].request_fn)) { // 请求项, hd_init 中挂载的是 do_hd_request
+		printk("Trying to read nonexistent block-device\n\r"); // print kernel
 		return;
 	}
 	make_request(major,rw,bh);
