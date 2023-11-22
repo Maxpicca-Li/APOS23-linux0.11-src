@@ -55,7 +55,7 @@ struct blk_dev_struct {
 };
 
 extern struct blk_dev_struct blk_dev[NR_BLK_DEV];
-extern struct request request[NR_REQUEST];
+extern struct request request[NR_REQUEST]; // 数组+链表（req.next）
 extern struct task_struct * wait_for_request;
 
 #ifdef MAJOR_NR

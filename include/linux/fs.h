@@ -70,7 +70,7 @@ struct buffer_head { // 缓冲块的管理信息
 	char * b_data;			/* pointer to data block (1024 bytes) */
 	unsigned long b_blocknr;	/* block number */
 	unsigned short b_dev;		/* device (0 = free) 数据源的设备号*/
-	unsigned char b_uptodate;   // 更新标志：表示数据是否已更新。
+	unsigned char b_uptodate;   // 更新标志：表示数据是否已更新；是，则已经读过了
 	unsigned char b_dirt;		/* 0-clean,1-dirty 修改标志*/
 	unsigned char b_count;		/* users using this block 使用的用户数，引用计数，类似 mem_map*/
 	unsigned char b_lock;		/* 0 - ok, 1 -locked 防止竞争+同时修改问题 */
