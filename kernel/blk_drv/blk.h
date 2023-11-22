@@ -128,12 +128,12 @@ extern inline void end_request(int uptodate)
 	wake_up(&CURRENT->waiting);
 	wake_up(&wait_for_request);
 	CURRENT->dev = -1;
-	CURRENT = CURRENT->next;
+	CURRENT = CURRENT->next; // 将当前请求项设置为下一个，为处理剩余请求项做准备
 }
 
-#define INIT_REQUEST \
+#define INIT_REQUEST /* FIXME lyq: 看逐行注释，理解细节 --> 判断是否还有剩余的请求项 */\
 repeat: \
-	if (!CURRENT) \
+	if (!CURRENT) /* CURRENT为空，即没有剩余请求项 */\
 		return; \
 	if (MAJOR(CURRENT->dev) != MAJOR_NR) \
 		panic(DEVICE_NAME ": request list destroyed"); \

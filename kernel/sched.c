@@ -128,7 +128,7 @@ void schedule(void)
 
 	while (1) {
 		c = -1;                 // c = 0xFFFFFFFF
-		next = 0;               // 指向下一个进程
+		next = 0;               // 指向下一个进程；默认进程0 【劳模进程0】
 		i = NR_TASKS;           // i = 64
 		p = &task[NR_TASKS];
 		while (--i) {           // 高往低遍历；找就绪态，时间片最多的
@@ -156,7 +156,7 @@ int sys_pause(void)     // 做进程调度，目前是**current 进程的内核�
 /* 
 等待这个共享 buffer 的所有进程，利用各个等待进程的内核栈（tmp 局部变量存储到内核栈），构建一个缓冲块进程等待队列，sleep_on 每次回去
  */
-void sleep_on(struct task_struct **p)
+void sleep_on(struct task_struct **p) // FIXME lyq: 为啥是从 task 数组角度考虑的呢？
 {
 	struct task_struct *tmp;
 
@@ -166,7 +166,7 @@ void sleep_on(struct task_struct **p)
 		panic("task[0] trying to sleep");
 	tmp = *p; // tmp 存上一个 b_wait 进程
 	*p = current; // p 指向当前需要 buffer 的进程
-	current->state = TASK_UNINTERRUPTIBLE; // 开始让 current 执行
+	current->state = TASK_UNINTERRUPTIBLE; // 开始让 current 执行；进程1在这里被挂起；进程0在上面的 sys_pause 中被挂起 --> 【全部被挂起】
 	schedule();
 	if (tmp)
 		tmp->state=0; // 0 即 TASK_UNINTERRUPTIBLE

@@ -238,13 +238,13 @@ _hd_interrupt:
 	outb %al,$0xA0		# EOI to interrupt controller #1
 	jmp 1f			# give port chance to breathe
 1:	jmp 1f
-1:	xorl %edx,%edx
-	xchgl _do_hd,%edx
-	testl %edx,%edx
+1:	xorl %edx,%edx     # 异或，清零
+	xchgl _do_hd,%edx  # kernel/blk_drv/hd.c 中 do_hd = intr_addr; 【xchg 是 exchange 的缩写，表示交换两个操作数的值。后缀 l 表示操作的是长字（long），在 32 位架构中，长字通常是 32 位的。】
+	testl %edx,%edx # 【testl %edx,%edx 经常用于检查寄存器的值是否为零，作为接下来的条件跳转指令（如 jz，跳转如果零）的依据。】
 	jne 1f
 	movl $_unexpected_hd_interrupt,%edx
 1:	outb %al,$0x20
-	call *%edx		# "interesting" way of handling intr.
+	call *%edx		# "interesting" way of handling intr. --> 调用 intr_addr 函数(这里是 read_intr 函数)
 	pop %fs
 	pop %es
 	pop %ds

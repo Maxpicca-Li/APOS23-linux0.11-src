@@ -48,7 +48,7 @@ static inline void lock_buffer(struct buffer_head * bh)
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait); // b_wait 是指 buffer 等待进程队列；【等待所有共享这个 buffer 的进程】
 	bh->b_lock=1;
-	sti();
+	sti(); // 防止硬件中断，如时钟中断
 }
 
 static inline void unlock_buffer(struct buffer_head * bh)
@@ -62,17 +62,17 @@ static inline void unlock_buffer(struct buffer_head * bh)
 /*
  * add-request adds a request to the linked list.
  * It disables interrupts so that it can muck with the
- * request-lists in peace.
+ * request-lists in peace. req 会加入到链表 dev->current_request 中
  */
 static void add_request(struct blk_dev_struct * dev, struct request * req)
 {
 	struct request * tmp;
 
 	req->next = NULL;
-	cli(); // 原子操作，防止写读竞争
+	cli(); // 原子操作，防止写读竞争【防止硬件中断】
 	if (req->bh)
-		req->bh->b_dirt = 0; // 清脏位，说明 dirty=0 & lock=1，说明这个 request 至少上路了
-	if (!(tmp = dev->current_request)) { // 如果current_request是 NULL，全0
+		req->bh->b_dirt = 0; // 清脏位，说明 dirty=0 & lock=1，说明这个 request 至少上路了 --> FIXME lyq: 不写回这个 dirty 的 block 吗？
+	if (!(tmp = dev->current_request)) { // 如果 current_request 是 NULL，全0 --> kernel/blk_drv/blk.h blk_dev[NR_BLK_DEV] 初始化为 NULL
 		dev->current_request = req;
 		sti();
 		(dev->request_fn)(); // 调用硬盘请求项处理函数，这里是 do_hd_request() 去给硬盘发送读盘命令
@@ -130,7 +130,7 @@ repeat:
 			unlock_buffer(bh);
 			return;
 		}
-		sleep_on(&wait_for_request); // 非预读写，还是需要等待 buffer request 的 --> 等待整个 buffer 请求项
+		sleep_on(&wait_for_request); // 非预读写，还是需要等待 buffer request 的 --> 【等待整个 buffer 请求项】
 		goto repeat;
 	}
 /* fill up the request-info, and add it to the queue --> 直接就在 32 个请求项数组中做的，因为之前赋值了 req = request+NR_REQUEST... */
@@ -146,7 +146,7 @@ repeat:
 	add_request(major+blk_dev,req); // 加载请求项，blk_dev 是那个数组，blk_dev+major 刚好是 hd 那项
 }
 
-void ll_rw_block(int rw, struct buffer_head * bh)
+void ll_rw_block(int rw, struct buffer_head * bh) // 底层（low layer）块设备操作
 {
 	unsigned int major;
 

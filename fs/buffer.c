@@ -39,8 +39,8 @@ int NR_BUFFERS = 0;
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	cli(); // 原子操作
-	while (bh->b_lock) // NOTE lyq: 可能考：为什么这里用 while 而不是 if，因为一次 sleep_on 可能等不到解锁。
-		sleep_on(&bh->b_wait);
+	while (bh->b_lock) // NOTE lyq: 可能考：为什么这里用 while 而不是 if，因为一次 sleep_on 可能等不到解锁。【在 make_request 处加锁】
+		sleep_on(&bh->b_wait); // b_wait 目前等的进程
 	sti();
 }
 

@@ -187,9 +187,9 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 	if (drive>1 || head>15)
 		panic("Trying to write bad sector");
 	if (!controller_ready())
-		panic("HD controller not ready");
-	do_hd = intr_addr;
-	outb_p(hd_info[drive].ctl,HD_CMD);
+		panic("HD controller not ready"); // 如果等待一段时间后仍未就绪则出错，死机。
+	do_hd = intr_addr; // read_intr / write_intr
+	outb_p(hd_info[drive].ctl,HD_CMD);    // 给硬盘发命令 --> PIO & DMA 两种模式，本代码为 PIO 模式，一次拿一个扇区，一共需要2个扇区（make_request, req->nr_sectors=2），故一个命令跑两次
 	port=HD_DATA;
 	outb_p(hd_info[drive].wpcom>>2,++port);
 	outb_p(nsect,++port);
@@ -250,17 +250,17 @@ static void bad_rw_intr(void)
 
 static void read_intr(void)
 {
-	if (win_result()) {
+	if (win_result()) { // 硬盘情况判断
 		bad_rw_intr();
 		do_hd_request();
 		return;
 	}
-	port_read(HD_DATA,CURRENT->buffer,256);
+	port_read(HD_DATA,CURRENT->buffer,256); // PIO 模式问答
 	CURRENT->errors = 0;
 	CURRENT->buffer += 512;
 	CURRENT->sector++;
-	if (--CURRENT->nr_sectors) {
-		do_hd = &read_intr;
+	if (--CURRENT->nr_sectors) { // 读了之后，需要读的扇区数--
+		do_hd = &read_intr;      // 还有要读的内容，继续挂载
 		return;
 	}
 	end_request(1);
@@ -299,9 +299,9 @@ void do_hd_request(void)
 	unsigned int sec,head,cyl;
 	unsigned int nsect;
 
-	INIT_REQUEST;
-	dev = MINOR(CURRENT->dev);
-	block = CURRENT->sector;
+	INIT_REQUEST; // 这里判断是否还有剩余的请求项
+	dev = MINOR(CURRENT->dev); // 从请求中获取设备号
+	block = CURRENT->sector;   // 获取块号
 	if (dev >= 5*NR_HD || block+2 > hd[dev].nr_sects) {
 		end_request(0);
 		goto repeat;
@@ -309,7 +309,7 @@ void do_hd_request(void)
 	block += hd[dev].start_sect;
 	dev /= 5;
 	__asm__("divl %4":"=a" (block),"=d" (sec):"0" (block),"1" (0),
-		"r" (hd_info[dev].sect));
+		"r" (hd_info[dev].sect)); // 基于块号换算磁头、扇区、柱面等参数
 	__asm__("divl %4":"=a" (cyl),"=d" (head):"0" (block),"1" (0),
 		"r" (hd_info[dev].head));
 	sec++;
@@ -344,7 +344,7 @@ void do_hd_request(void)
 void hd_init(void)
 {
 	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
-	set_intr_gate(0x2E,&hd_interrupt);
+	set_intr_gate(0x2E,&hd_interrupt); // 中断门挂载
 	outb_p(inb_p(0x21)&0xfb,0x21);
 	outb(inb_p(0xA1)&0xbf,0xA1);
 }
