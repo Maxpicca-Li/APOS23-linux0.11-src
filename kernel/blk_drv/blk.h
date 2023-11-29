@@ -32,7 +32,7 @@ struct request {
 	unsigned long sector;                   // 起始扇区。(1 块=2 扇区)
 	unsigned long nr_sectors;               // 读/写扇区数
     char * buffer;                          // 缓冲区
-	struct task_struct * waiting;           // 任务等待操作执行完成的地方。 
+	struct task_struct * waiting;           // 任务等待操作执行完成的地方 --> 等待请求项的进程
 	struct buffer_head * bh;                // 缓冲区头指针(include/linux/fs.h,68)。 
 	struct request * next;                  // 指向下一请求项。
 };
@@ -105,19 +105,19 @@ void (*DEVICE_INTR)(void) = NULL;
 #endif
 static void (DEVICE_REQUEST)(void);
 
-extern inline void unlock_buffer(struct buffer_head * bh)
+extern inline void unlock_buffer(struct buffer_head * bh) // 解锁缓冲块
 {
 	if (!bh->b_lock)
 		printk(DEVICE_NAME ": free buffer being unlocked\n");
 	bh->b_lock=0;
-	wake_up(&bh->b_wait);
+	wake_up(&bh->b_wait); // 唤醒等待该缓冲块数据的进程
 }
 
 extern inline void end_request(int uptodate)
 {
 	DEVICE_OFF(CURRENT->dev);
 	if (CURRENT->bh) {
-		CURRENT->bh->b_uptodate = uptodate;
+		CURRENT->bh->b_uptodate = uptodate; // uptodate: 可以理解为 valid, 置为1
 		unlock_buffer(CURRENT->bh);
 	}
 	if (!uptodate) {
@@ -125,10 +125,10 @@ extern inline void end_request(int uptodate)
 		printk("dev %04x, block %d\n\r",CURRENT->dev,
 			CURRENT->bh->b_blocknr);
 	}
-	wake_up(&CURRENT->waiting);
+	wake_up(&CURRENT->waiting); // 0.11 没有使用它
 	wake_up(&wait_for_request);
-	CURRENT->dev = -1;
-	CURRENT = CURRENT->next; // 将当前请求项设置为下一个，为处理剩余请求项做准备
+	CURRENT->dev = -1; 		 // 请求项状态：占用-->空闲 （其实这一步会被下一步覆盖的）
+	CURRENT = CURRENT->next; // 将当前请求项设置为下一个，为处理剩余请求项做准备 --> 仍然在数组中，但是脱离了请求项的队列
 }
 
 #define INIT_REQUEST /* FIXME lyq: 看逐行注释，理解细节 --> 判断是否还有剩余的请求项 */\

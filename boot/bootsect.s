@@ -45,7 +45,7 @@ ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
 
 ! ROOT_DEV:	0x000 - same type of floppy as boot.
 !		0x301 - first partition on first drive etc
-! 根设备, 如硬盘等
+! 根设备, 如硬盘等 --> 0x3**, 说明是硬盘根设备
 ROOT_DEV = 0x306
 
 ! 边执行边把自己从 BOOTSEG 拷贝到 INITSEG, 一共 1KB, 0x90000 - 0x90200

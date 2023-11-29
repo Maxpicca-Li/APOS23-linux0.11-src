@@ -164,12 +164,12 @@ void sleep_on(struct task_struct **p) // FIXME lyq: 为啥是从 task 数组角�
 		return;
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
-	tmp = *p; // tmp 存上一个 b_wait 进程
+	tmp = *p; // tmp 存“上一个 b_wait 进程”, p 指向 b_wait 进程，buffer 这边第一次调用时为 NULL; 下一步 p 将指向进程1的task_struct
 	*p = current; // p 指向当前需要 buffer 的进程
 	current->state = TASK_UNINTERRUPTIBLE; // 开始让 current 执行；进程1在这里被挂起；进程0在上面的 sys_pause 中被挂起 --> 【全部被挂起】
 	schedule();
 	if (tmp)
-		tmp->state=0; // 0 即 TASK_UNINTERRUPTIBLE
+		tmp->state=0; // 0 即 TASK_RUNNING
 }
 
 void interruptible_sleep_on(struct task_struct **p)
@@ -195,9 +195,9 @@ repeat:	current->state = TASK_INTERRUPTIBLE;
 
 void wake_up(struct task_struct **p)
 {
-	if (p && *p) {
-		(**p).state=0;
-		*p=NULL;
+	if (p && *p) { // p: 指向 b_wait 的指针；*p b_wait 的值；**p b_wait指向的task_struct
+		(**p).state=0; // 0 即 runnable，TASKRUNNING，改为就绪态
+		*p=NULL; // [按理说，应该是 *p=tmp; --> 显示用队列唤醒上一个]，[*p=NULL, 隐式唤醒，等待调度]
 	}
 }
 

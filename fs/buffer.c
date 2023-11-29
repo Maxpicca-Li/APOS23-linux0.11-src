@@ -281,7 +281,7 @@ struct buffer_head * bread(int dev,int block) //返回 buffer head
 	// ⬆ 缓冲区 || ⬇ 请求项
 	ll_rw_block(READ,bh); // low floor
 	wait_on_buffer(bh);
-	if (bh->b_uptodate)
+	if (bh->b_uptodate)   // 读完了后，返回 bh
 		return bh;
 	brelse(bh);
 	return NULL;

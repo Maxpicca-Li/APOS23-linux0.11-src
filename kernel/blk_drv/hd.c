@@ -56,7 +56,7 @@ static int NR_HD = 0;
 static struct hd_struct {
 	long start_sect;
 	long nr_sects;
-} hd[5*MAX_HD]={{0,0},};
+} hd[5*MAX_HD]={{0,0},}; // 每个物理逻辑盘有5个分区
 
 #define port_read(port,buf,nr) \
 __asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr):"cx","di")
@@ -135,7 +135,10 @@ int sys_setup(void * BIOS)
 		hd[i*5].nr_sects = 0;
 	}
 	for (drive=0 ; drive<NR_HD ; drive++) { //第1个物理盘设备号是0x300，第2个是0x305，读每个物理硬盘的0号块，即引导块，有分区信息
-		if (!(bh = bread(0x300 + drive*5,0))) { // bread: block read
+		// kernel/blk_drv/ll_rw_blk.c
+		// 0x300>>8 = 3，对应struct blk_dev_struct blk_dev[NR_BLK_DEV]中硬盘的编号
+		// 0x300 HD; 0x200, FD; 0x100, RD
+		if (!(bh = bread(0x300 + drive*5,0))) { // bread: block read, 读取引导块
 			printk("Unable to read partition table of drive %d\n\r",
 				drive);
 			panic("");
@@ -263,7 +266,7 @@ static void read_intr(void)
 		do_hd = &read_intr;      // 还有要读的内容，继续挂载
 		return;
 	}
-	end_request(1);
+	end_request(1);				// 更新 b_uptodate
 	do_hd_request();
 }
 

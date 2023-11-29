@@ -251,7 +251,7 @@ _hd_interrupt:
 	popl %edx
 	popl %ecx
 	popl %eax
-	iret
+	iret			# 回到进程0继续pause
 
 _floppy_interrupt:
 	pushl %eax

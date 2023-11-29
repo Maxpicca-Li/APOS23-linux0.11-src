@@ -23,6 +23,7 @@ struct request request[NR_REQUEST];
 
 /*
  * used to wait on when there are no free requests
+ * 等待请求项的数组
  */
 struct task_struct * wait_for_request = NULL;
 

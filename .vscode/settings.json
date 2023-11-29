@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "tty.h": "c",
-        "io.h": "c"
+        "io.h": "c",
+        "sched.h": "c"
     }
 }
