@@ -127,17 +127,17 @@ ok_load_setup:
 	jne	root_defined
 	seg cs
 	mov	bx,sectors
-	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb
+	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb, 设备号为0x2**, 为软盘
 	cmp	bx,#15
 	je	root_defined
-	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb
+	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb, 设备号为0x2**, 为软盘
 	cmp	bx,#18
 	je	root_defined
 undef_root:
 	jmp undef_root
-root_defined:
+root_defined:           ! 定义根设备
 	seg cs
-	mov	root_dev,ax
+	mov	root_dev,ax     ! ax 为 #0x021c, 故根设备定义在软盘
 
 ! after that (everyting loaded), we jump to
 ! the setup-routine loaded directly after

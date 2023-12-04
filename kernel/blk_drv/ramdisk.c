@@ -72,6 +72,7 @@ long rd_init(long mem_start, int length)
  */
 void rd_load(void)
 {
+	// step1: 把整个软盘复制到/映射到虚拟盘
 	struct buffer_head *bh;
 	struct super_block	s;
 	int		block = 256;	/* Start at block 256 */
@@ -83,9 +84,9 @@ void rd_load(void)
 		return;
 	printk("Ram disk: %d bytes, starting at 0x%x\n", rd_length,
 		(int) rd_start);
-	if (MAJOR(ROOT_DEV) != 2)
+	if (MAJOR(ROOT_DEV) != 2) // 软盘
 		return;
-	bh = breada(ROOT_DEV,block+1,block,block+2,-1);
+	bh = breada(ROOT_DEV,block+1,block,block+2,-1); // 预读，block 引导块；block+1 超级块；block+2 inode 位点图
 	if (!bh) {
 		printk("Disk error while looking for ramdisk!\n");
 		return;
@@ -123,5 +124,6 @@ void rd_load(void)
 		i++;
 	}
 	printk("\010\010\010\010\010done \n");
+	// step2: 设置设备号，MAJOR(ROOT_DEV) 从 2 变到 1
 	ROOT_DEV=0x0101;
 }

@@ -100,7 +100,7 @@ struct task_struct {
 	struct m_inode * root;
 	struct m_inode * executable;
 	unsigned long close_on_exec;
-	struct file * filp[NR_OPEN];                // 最多打开 20 个文件
+	struct file * filp[NR_OPEN]; // 最多打开 20 个文件，进程的文件管理结构，filp[i] 对应一个文件管理表 file_table[i]，指向一个 i 节点管理表项 --> 允许重复打开一个文件
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
 	struct desc_struct ldt[3];
 /* tss for this task */

@@ -239,6 +239,7 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 	return 0;			/* we do that in umount */
 }
 
+// 加载根文件系统：mount_root；加载普通文件系统: sys_mount
 void mount_root(void)
 {
 	int i,free;
@@ -247,24 +248,24 @@ void mount_root(void)
 
 	if (32 != sizeof (struct d_inode))
 		panic("bad i-node size");
-	for(i=0;i<NR_FILE;i++)
+	for(i=0;i<NR_FILE;i++) // 初始化文件引用计数
 		file_table[i].f_count=0;
 	if (MAJOR(ROOT_DEV) == 2) {
 		printk("Insert root floppy and press ENTER");
 		wait_for_keypress();
 	}
-	for(p = &super_block[0] ; p < &super_block[NR_SUPER] ; p++) {
+	for(p = &super_block[0] ; p < &super_block[NR_SUPER] ; p++) { // 初始化超级块
 		p->s_dev = 0;
 		p->s_lock = 0;
 		p->s_wait = NULL;
 	}
-	if (!(p=read_super(ROOT_DEV)))
+	if (!(p=read_super(ROOT_DEV))) // 此时 ROOT_DEV MAJOR = 1
 		panic("Unable to mount root");
-	if (!(mi=iget(ROOT_DEV,ROOT_INO)))
+	if (!(mi=iget(ROOT_DEV,ROOT_INO))) // ROOT_INO: 根 i 节点的 number 为 1 --> 获取虚拟盘上的根i节点
 		panic("Unable to read root i-node");
-	mi->i_count += 3 ;	/* NOTE! it is logically used 4 times, not 1 */
-	p->s_isup = p->s_imount = mi;
-	current->pwd = mi;
+	mi->i_count += 3 ;	/* NOTE! it is logically used 4 times, not 1 */ // FIXME lyq:为啥这里是+3
+	p->s_isup = p->s_imount = mi; /* NOTE lyq: 核心语句，根i节点本身的isup和imount就是他自己本身，由此根文件系统加载完毕 */
+	current->pwd = mi; // pwd 当前位置(Print Working Directory)，current目前为进程1 // NOTE lyq: 当前找到的虚拟盘文件系统在根文件系统的位置，提前存下来。可以用于相对路径的使用 --> 从进程1开始有文件系统功能
 	current->root = mi;
 	free=0;
 	i=p->s_nzones;

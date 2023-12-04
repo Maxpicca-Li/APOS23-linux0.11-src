@@ -157,8 +157,9 @@ int sys_setup(void * BIOS)
 	}
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
+	// 加载根文件系统 rd_load, mount_root
 	rd_load();
-	mount_root();
+	mount_root(); // 把虚拟文件的根设备加载到文件系统
 	return (0);
 }
 

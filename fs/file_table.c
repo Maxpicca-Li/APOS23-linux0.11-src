@@ -6,4 +6,4 @@
 
 #include <linux/fs.h>
 
-struct file file_table[NR_FILE];
+struct file file_table[NR_FILE]; // NR_FILE=64

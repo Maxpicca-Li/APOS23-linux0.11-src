@@ -12,7 +12,7 @@
 #include <linux/mm.h>
 #include <asm/system.h>
 
-struct m_inode inode_table[NR_INODE]={{0,},};
+struct m_inode inode_table[NR_INODE]={{0,},}; // NR_INODE = 32, 内存中的 inode
 
 static void read_inode(struct m_inode * inode);
 static void write_inode(struct m_inode * inode);
