@@ -81,7 +81,7 @@ struct buffer_head { // 缓冲块的管理信息
 	struct buffer_head * b_next_free;
 };
 
-struct d_inode {    // disk i 节点
+struct d_inode {    // disk i 节点 --> 断电保存
 	unsigned short i_mode;
 	unsigned short i_uid;
 	unsigned long i_size;
@@ -91,34 +91,34 @@ struct d_inode {    // disk i 节点
 	unsigned short i_zone[9]; // 文件的数据块的位置信息
 };
 
-struct m_inode {    // memory i 节点
-	unsigned short i_mode;
-	unsigned short i_uid;
-	unsigned long i_size;
-	unsigned long i_mtime;
-	unsigned char i_gid;
-	unsigned char i_nlinks;
-	unsigned short i_zone[9];
+struct m_inode {    // memory i 节点 --> 通电使用
+	unsigned short i_mode; // 文件类型和属性(rwx 位)。
+	unsigned short i_uid; // 用户 id（文件拥有者标识符）。
+	unsigned long i_size; // 文件大小（字节数）。
+	unsigned long i_mtime; // 文件修改时间（自 1970.1.1:0 算起，秒）
+	unsigned char i_gid; // 组 id(文件拥有者所在的组)。
+	unsigned char i_nlinks; // 文件目录项链接数。
+	unsigned short i_zone[9]; // 直接(0-6)、间接(7)或双重间接(8)逻辑块号。zone 是区的意思，可译成区段，或逻辑块。
 /* these are in memory also */
-	struct task_struct * i_wait;
-	unsigned long i_atime;
-	unsigned long i_ctime;
-	unsigned short i_dev;
-	unsigned short i_num;
-	unsigned short i_count;
+	struct task_struct * i_wait; // 等待该 i 节点的进程
+	unsigned long i_atime; // 最后访问时间。
+	unsigned long i_ctime; // i 节点自身修改时间。
+	unsigned short i_dev; // i 节点所在的设备号。
+	unsigned short i_num; // i 节点号，对应 “i 节点位图” 中的索引，其中 ROOT i_num = 1
+	unsigned short i_count; // i 节点被使用的次数，0 表示该 i 节点空闲。 --> 进程最多64，所以 short 不虚
 	unsigned char i_lock;
 	unsigned char i_dirt;
-	unsigned char i_pipe;
-	unsigned char i_mount;
-	unsigned char i_seek;
+	unsigned char i_pipe; // 管道标志。
+	unsigned char i_mount; // 安装标志。
+	unsigned char i_seek; // 搜寻标志(lseek 时)。
 	unsigned char i_update;
 };
 
 struct file {   // 一个文件一个 i 节点，一套在硬盘上，一套在内存中，内存的相比硬盘的多一些
-	unsigned short f_mode;
-	unsigned short f_flags;
-	unsigned short f_count;
-	struct m_inode * f_inode;
+	unsigned short f_mode; // 文件操作模式
+	unsigned short f_flags; // 文件打开、控制标志
+	unsigned short f_count; // 文件句柄数
+	struct m_inode * f_inode; // 指向文件对应的 i 节点
 	off_t f_pos;
 };
 
@@ -132,11 +132,11 @@ struct super_block {
 	unsigned long s_max_size;       // 文件最大长度
 	unsigned short s_magic;         // 文件系统魔数，判断文件系统是否一致
 /* These are only in memory */
-	struct buffer_head * s_imap[8]; // i 节点位图缓冲块指针数组(占用 8 块，可表示 64M)
-	struct buffer_head * s_zmap[8]; // 逻辑块位图缓冲块指针数组（占用 8 块）
+	struct buffer_head * s_imap[8]; // i 节点位图【缓冲块】指针数组(占用 8 块，8个缓冲块，一块1KB, 8*8*1K = 64K 个比特，可以表示 64K的inode数量；1个inode对应1KB数据，故可表示 64M)
+	struct buffer_head * s_zmap[8]; // 逻辑块位图【缓冲块】指针数组（占用 8 块）
 	unsigned short s_dev;           // 超级块所在的设备号
 	struct m_inode * s_isup;        // 被挂载的文件系统根目录的 i 节点。(isup = i super) --> 根文件系统 i 节点，貌似只用了一次
-	struct m_inode * s_imount;      // 被挂载到的 i 节点 --> 文件系统的 i 节点，经常被使用
+	struct m_inode * s_imount;      // 被挂载到的 i 节点 --> 文件系统的 i 节点，经常被使用 --> super_block 会挂载到 imount 指向的节点上。
 	unsigned long s_time;           // 修改时间
 	struct task_struct * s_wait;    // 等待该超级块的进程
 	unsigned char s_lock;           // 被锁定标志

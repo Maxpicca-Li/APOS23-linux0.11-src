@@ -87,7 +87,7 @@ int copy_process(
 		return -EAGAIN;
 	task[nr] = p;
 	// 复制进程 0 的 task_struct 内容，此时 ldt & tss 也一样，为后面的 copy on write 做了准备 -> 开始的时候共享，当子进程write的时候，才开始加载
-	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
+	*p = *current;	/* NOTE! this doesn't copy the supervisor stack，仅复制task_struct内容，不复制stack */
 	p->state = TASK_UNINTERRUPTIBLE; // 只有内核代码中明确表示将该进程设置为就绪状态才能被唤醒; 除此之外，没有任何办法将其唤醒
 	// 进程自定义设置
 	p->pid = last_pid;
@@ -127,10 +127,10 @@ int copy_process(
 		free_page((long) p);
 		return -EAGAIN;
 	}
-	for (i=0; i<NR_OPEN;i++)        // 调整打开的文件数量
+	for (i=0; i<NR_OPEN;i++)        // 调整打开的文件的引用计数，子进程引用计数+1
 		if (f=p->filp[i])
 			f->f_count++;
-	if (current->pwd)
+	if (current->pwd)	// 进程0创建进程1的时候为NULL；进程1创建进程2的时候，i_count++
 		current->pwd->i_count++;    // 指向当前进程的指针
 	if (current->root)
 		current->root->i_count++;

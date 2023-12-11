@@ -106,12 +106,12 @@ static struct super_block * read_super(int dev)
 	if (!dev)
 		return NULL;
 	check_disk_change(dev);
-	if (s = get_super(dev))
+	if (s = get_super(dev)) // 如果 dev 已经载入，则直接返回
 		return s;
 	for (s = 0+super_block ;; s++) {
 		if (s >= NR_SUPER+super_block)
 			return NULL;
-		if (!s->s_dev)
+		if (!s->s_dev) // 超级块中还没有分配 dev --> 空闲超级块
 			break;
 	}
 	s->s_dev = dev;
@@ -120,16 +120,16 @@ static struct super_block * read_super(int dev)
 	s->s_time = 0;
 	s->s_rd_only = 0;
 	s->s_dirt = 0;
-	lock_super(s);
-	if (!(bh = bread(dev,1))) {
+	lock_super(s); // 加锁，之后会涉及读缓冲块
+	if (!(bh = bread(dev,1))) { // bread 读超级块到缓冲区
 		s->s_dev=0;
 		free_super(s);
 		return NULL;
 	}
 	*((struct d_super_block *) s) =
 		*((struct d_super_block *) bh->b_data);
-	brelse(bh);
-	if (s->s_magic != SUPER_MAGIC) {
+	brelse(bh); // 这里的缓冲区只是临时使用
+	if (s->s_magic != SUPER_MAGIC) { // 魔数检测，确定设备的文件系统是否可用
 		s->s_dev = 0;
 		free_super(s);
 		return NULL;
@@ -197,45 +197,46 @@ int sys_umount(char * dev_name)
 	return 0;
 }
 
+// dev--mount-->dir，这里的 mount 挂载可以理解为将设备 dev【安装】到目录 dir 中
 int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 {
 	struct m_inode * dev_i, * dir_i;
 	struct super_block * sb;
 	int dev;
 
-	if (!(dev_i=namei(dev_name)))
+	if (!(dev_i=namei(dev_name))) // step1: 获取设备(一般是hd1)文件的i节点
 		return -ENOENT;
-	dev = dev_i->i_zone[0];
-	if (!S_ISBLK(dev_i->i_mode)) {
+	dev = dev_i->i_zone[0]; // step2: 获取设备号
+	if (!S_ISBLK(dev_i->i_mode)) { // 判断是否是设备文件
 		iput(dev_i);
 		return -EPERM;
 	}
-	iput(dev_i);
-	if (!(dir_i=namei(dir_name)))
+	iput(dev_i); // step3: 释放设备 inode --> 用时放入 inode_table[32]，用完移除 inode_table[32]
+	if (!(dir_i=namei(dir_name))) // step4: 获取mount的目录地址的i节点
 		return -ENOENT;
-	if (dir_i->i_count != 1 || dir_i->i_num == ROOT_INO) {
+	if (dir_i->i_count != 1 || dir_i->i_num == ROOT_INO) { // ROOT_INO ROOT 的 i_num，即判断挂载的目录是否是根inode
 		iput(dir_i);
 		return -EBUSY;
 	}
-	if (!S_ISDIR(dir_i->i_mode)) {
+	if (!S_ISDIR(dir_i->i_mode)) { // 判断是不是文件
 		iput(dir_i);
 		return -EPERM;
 	}
-	if (!(sb=read_super(dev))) {
+	if (!(sb=read_super(dev))) { // 读取需要挂载的设备的超级块 --> 会载入到 super_block 中
 		iput(dir_i);
 		return -EBUSY;
 	}
-	if (sb->s_imount) {
+	if (sb->s_imount) { // 判断这个超级块是否被挂载（如果已经挂载了，你还来 sys_mount 干嘛！）
 		iput(dir_i);
 		return -EBUSY;
 	}
-	if (dir_i->i_mount) {
+	if (dir_i->i_mount) { // 判断要挂载的目录，是否被挂载（如果已经被挂载了，就不能将我们的dev挂载到dir上了）
 		iput(dir_i);
 		return -EPERM;
 	}
-	sb->s_imount=dir_i;
-	dir_i->i_mount=1;
-	dir_i->i_dirt=1;		/* NOTE! we don't iput(dir_i) */
+	sb->s_imount=dir_i; // 挂载时，赋值 dir 的 inode
+	dir_i->i_mount=1; // 挂载后置1
+	dir_i->i_dirt=1; // 修改后，dir置1/* NOTE! we don't iput(dir_i) */
 	return 0;			/* we do that in umount */
 }
 
@@ -266,17 +267,17 @@ void mount_root(void)
 	mi->i_count += 3 ;	/* NOTE! it is logically used 4 times, not 1 */ // FIXME lyq:为啥这里是+3
 	p->s_isup = p->s_imount = mi; /* NOTE lyq: 核心语句，根i节点本身的isup和imount就是他自己本身，由此根文件系统加载完毕 */
 	current->pwd = mi; // pwd 当前位置(Print Working Directory)，current目前为进程1 // NOTE lyq: 当前找到的虚拟盘文件系统在根文件系统的位置，提前存下来。可以用于相对路径的使用 --> 从进程1开始有文件系统功能
-	current->root = mi;
+	current->root = mi; // fs/open.c 中 sys_chroot 和 sys_chdir 可以修改 root 和 pwd
 	free=0;
-	i=p->s_nzones;
+	i=p->s_nzones; // p的逻辑块数
 	while (-- i >= 0)
-		if (!set_bit(i&8191,p->s_zmap[i>>13]->b_data))
+		if (!set_bit(i&8191,p->s_zmap[i>>13]->b_data)) // 逻辑块位图 0x1FFF
 			free++;
 	printk("%d/%d free blocks\n\r",free,p->s_nzones);
 	free=0;
-	i=p->s_ninodes+1;
+	i=p->s_ninodes+1; // p 的i节点数
 	while (-- i >= 0)
-		if (!set_bit(i&8191,p->s_imap[i>>13]->b_data))
+		if (!set_bit(i&8191,p->s_imap[i>>13]->b_data)) // i节点位图 0x1FFF
 			free++;
 	printk("%d/%d free inodes\n\r",free,p->s_ninodes);
 }

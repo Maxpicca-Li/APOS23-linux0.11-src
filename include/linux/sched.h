@@ -125,7 +125,7 @@ struct task_struct {
 /* uid etc */	0,0,0,0,0,0, \
 /* alarm */	0,0,0,0,0,0, \
 /* math */	0, \
-/* fs info */	-1,0022,NULL,NULL,NULL,0, \
+/* fs info */	-1,0022,NULL,NULL,NULL,0, /* 进程0 的 pwd, root, executable 都是 NULL, 即进程0不挂载任何文件系统 */\
 /* filp */	{NULL,}, \
 /* ldt */	{ \
 		{0,0}, \

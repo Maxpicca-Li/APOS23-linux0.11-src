@@ -87,6 +87,7 @@ static int match(int len,const char * name,struct dir_entry * de)
  *
  * This also takes care of the few special cases due to '..'-traversal
  * over a pseudo-root and a mount point.
+ * 根据目录文件 i 节点和目录名信息，获取目录文件中的目录项。
  */
 static struct buffer_head * find_entry(struct m_inode ** dir,
 	const char * name, int namelen, struct dir_entry ** res_dir)
@@ -274,6 +275,7 @@ static struct m_inode * get_dir(const char * pathname)
  *
  * dir_namei() returns the inode of the directory of the
  * specified name, and the name within that directory.
+ * 不断分析路径，获得path中的目录文件 i 节点
  */
 static struct m_inode * dir_namei(const char * pathname,
 	int * namelen, const char ** name)
@@ -333,6 +335,7 @@ struct m_inode * namei(const char * pathname)
  *	open_namei()
  *
  * namei for open - this is in fact almost the whole open-routine.
+ * 分析pathname路径信息，最终获取目标文件 i 节点放在 res_inode 中
  */
 int open_namei(const char * pathname, int flag, int mode,
 	struct m_inode ** res_inode)

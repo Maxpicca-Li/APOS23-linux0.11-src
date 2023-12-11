@@ -241,6 +241,7 @@ struct m_inode * get_pipe_inode(void)
 	return inode;
 }
 
+/* 根据设备号和i节点号，获取目录文件i节点 */
 struct m_inode * iget(int dev,int nr)
 {
 	struct m_inode * inode, * empty;

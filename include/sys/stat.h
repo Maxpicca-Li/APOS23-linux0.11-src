@@ -17,15 +17,19 @@ struct stat {
 	time_t	st_ctime;
 };
 
-#define S_IFMT  00170000
-#define S_IFREG  0100000
-#define S_IFBLK  0060000
-#define S_IFDIR  0040000
-#define S_IFCHR  0020000
-#define S_IFIFO  0010000
-#define S_ISUID  0004000
-#define S_ISGID  0002000
-#define S_ISVTX  0001000
+/* 用于识别 inode 种类 */
+#define S_IFMT  00170000 // 0b1111000000000000 文件类型（8 进制表示）
+#define S_IFREG  0100000 // 0b1000000000000000 常规文件
+#define S_IFBLK  0060000 // 0b0110000000000000 块特殊（设备）文件，如磁盘 dev/fd0
+#define S_IFDIR  0040000 // 0b0100000000000000 目录文件
+#define S_IFCHR  0020000 // 0b0010000000000000 字符设备文件
+#define S_IFIFO  0010000 // 0b0001000000000000 FIFO 特殊文件
+// 文件属性位：
+// S_ISUID 用于测试文件的 Set-User-ID 标志是否置位。若该标志置位，则当执行该文件时，进程的
+// 有效用户 ID 将被设置为该文件宿主的用户 ID。S_ISGID 则是针对组 ID 进行相同处理。
+#define S_ISUID  0004000 // 执行时设置用户 ID（set-user-ID）
+#define S_ISGID  0002000 // 执行时设置组 ID（set-group-ID）
+#define S_ISVTX  0001000 // 对于目录，受限删除标志
 
 #define S_ISREG(m)	(((m) & S_IFMT) == S_IFREG)
 #define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)
