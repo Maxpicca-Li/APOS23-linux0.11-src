@@ -147,6 +147,7 @@ int create_block(struct m_inode * inode, int block)
 	return _bmap(inode,block,1);
 }
 		
+// 释放一个 i 节点(回写入设备)。
 void iput(struct m_inode * inode)
 {
 	if (!inode)
@@ -241,7 +242,7 @@ struct m_inode * get_pipe_inode(void)
 	return inode;
 }
 
-/* 根据设备号和i节点号，获取目录文件i节点 */
+/* 根据设备号和i节点号，从设备上读取指定节点号的 i 节点 */
 struct m_inode * iget(int dev,int nr)
 {
 	struct m_inode * inode, * empty;

@@ -143,17 +143,17 @@ int sys_open(const char * filename,int flag,int mode)
 
 	mode &= 0777 & ~current->umask; // 0777 是八进制，设置用户许可使用模式
 	for(fd=0 ; fd<NR_OPEN ; fd++) // 寻找空闲项，flip 的索引即为该文件句柄
-		if (!current->filp[fd])
+		if (!current->filp[fd]) // NULL为空
 			break;
 	if (fd>=NR_OPEN)
 		return -EINVAL;
 	current->close_on_exec &= ~(1<<fd); // 将该文件句柄【执行时关闭标志】设置为0
 	f=0+file_table;
 	for (i=0 ; i<NR_FILE ; i++,f++) // file_table 中找空闲项
-		if (!f->f_count) break;
+		if (!f->f_count) break; // f_count 为0
 	if (i>=NR_FILE)
 		return -EINVAL;
-	(current->filp[fd]=f)->f_count++; // filp 文件对应，f_count 基于 file 进行计数
+	(current->filp[fd]=f)->f_count++; // 两个操作：filp 文件对应，f_count 基于 file 进行计数
 	if ((i=open_namei(filename,flag,mode,&inode))<0) {
 		current->filp[fd]=NULL;
 		f->f_count=0;
@@ -179,7 +179,7 @@ int sys_open(const char * filename,int flag,int mode)
 	f->f_mode = inode->i_mode;
 	f->f_flags = flag;
 	f->f_count = 1;
-	f->f_inode = inode;
+	f->f_inode = inode; // file_table 上 inode 挂载
 	f->f_pos = 0;
 	return (fd);
 }

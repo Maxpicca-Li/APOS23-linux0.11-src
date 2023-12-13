@@ -92,7 +92,7 @@ struct d_inode {    // disk i 节点 --> 断电保存
 };
 
 struct m_inode {    // memory i 节点 --> 通电使用
-	unsigned short i_mode; // 文件类型和属性(rwx 位)。
+	unsigned short i_mode; // 文件类型和属性(rwx 位) --> 拿到一个inode就要先判断i_mode
 	unsigned short i_uid; // 用户 id（文件拥有者标识符）。
 	unsigned long i_size; // 文件大小（字节数）。
 	unsigned long i_mtime; // 文件修改时间（自 1970.1.1:0 算起，秒）
@@ -155,8 +155,8 @@ struct d_super_block {
 	unsigned short s_magic;
 };
 
-struct dir_entry {
-	unsigned short inode;
+struct dir_entry { // 针对目录，共16字节。如果一个目录文件占一个缓冲块（1024字节），那么能放64个目录项
+	unsigned short inode; // i节点位图的索引 --> inode number
 	char name[NAME_LEN];
 };
 

@@ -98,17 +98,18 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	struct dir_entry * de;
 	struct super_block * sb;
 
-#ifdef NO_TRUNCATE
+#ifdef NO_TRUNCATE // 如果定义了 NO_TRUNCATE，则若文件名长度超过最大长度 NAME_LEN，则返回
 	if (namelen > NAME_LEN)
 		return NULL;
 #else
 	if (namelen > NAME_LEN)
 		namelen = NAME_LEN;
 #endif
-	entries = (*dir)->i_size / (sizeof (struct dir_entry));
+	entries = (*dir)->i_size / (sizeof (struct dir_entry)); // 目录项个数
 	*res_dir = NULL;
 	if (!namelen)
 		return NULL;
+	// 文件目录中./ ../的处理
 /* check for '..', as we might have to do some "magic" for it */
 	if (namelen==2 && get_fs_byte(name)=='.' && get_fs_byte(name+1)=='.') {
 /* '..' in a pseudo-root results in a faked '.' (just change namelen) */
@@ -235,37 +236,38 @@ static struct m_inode * get_dir(const char * pathname)
 	int namelen,inr,idev;
 	struct dir_entry * de;
 
-	if (!current->root || !current->root->i_count)
+	if (!current->root || !current->root->i_count) // 确认根i节点是否正确 --> 绝对路径
 		panic("No root inode");
-	if (!current->pwd || !current->pwd->i_count)
+	if (!current->pwd || !current->pwd->i_count) // 相对路径
 		panic("No cwd inode");
-	if ((c=get_fs_byte(pathname))=='/') {
+	if ((c=get_fs_byte(pathname))=='/') { // 第一个就是'/'，绝对路径
 		inode = current->root;
 		pathname++;
 	} else if (c)
-		inode = current->pwd;
+		inode = current->pwd; // 普通字符->相对路径
 	else
 		return NULL;	/* empty name is bad */
 	inode->i_count++;
 	while (1) {
 		thisname = pathname;
+		// 是否是目录文件，是否允许打开
 		if (!S_ISDIR(inode->i_mode) || !permission(inode,MAY_EXEC)) {
 			iput(inode);
 			return NULL;
 		}
-		for(namelen=0;(c=get_fs_byte(pathname++))&&(c!='/');namelen++)
+		for(namelen=0;(c=get_fs_byte(pathname++))&&(c!='/');namelen++) // 获取下一个name的长度
 			/* nothing */ ;
-		if (!c)
-			return inode;
-		if (!(bh = find_entry(&inode,thisname,namelen,&de))) {
-			iput(inode);
+		if (!c) // c 如果为空，说明读到底了（即thisname[0...namelen-1]为目标文件名字）
+			return inode; // 【正常情况下，在这儿结束】
+		if (!(bh = find_entry(&inode,thisname,namelen,&de))) { // thisname[0...namelen-1] 就是需要的目录；de 放置了目录文件的 inr
+			iput(inode); // 缓冲块为空，释放 inode
 			return NULL;
 		}
 		inr = de->inode;
 		idev = inode->i_dev;
 		brelse(bh);
 		iput(inode);
-		if (!(inode = iget(idev,inr)))
+		if (!(inode = iget(idev,inr))) // 根据设备名和inr获取inode值
 			return NULL;
 	}
 }
@@ -290,7 +292,7 @@ static struct m_inode * dir_namei(const char * pathname,
 	while (c=get_fs_byte(pathname++))
 		if (c=='/')
 			basename=pathname;
-	*namelen = pathname-basename-1;
+	*namelen = pathname-basename-1; // 获得目标文件的namelen和文件名地址
 	*name = basename;
 	return dir;
 }
@@ -350,7 +352,7 @@ int open_namei(const char * pathname, int flag, int mode,
 		flag |= O_WRONLY;
 	mode &= 0777 & ~current->umask;
 	mode |= I_REGULAR;
-	if (!(dir = dir_namei(pathname,&namelen,&basename)))
+	if (!(dir = dir_namei(pathname,&namelen,&basename))) // 找到枝梢 i 节点 --> 最后一个目录文件 dir
 		return -ENOENT;
 	if (!namelen) {			/* special case: '/usr/' etc */
 		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) {
@@ -360,7 +362,7 @@ int open_namei(const char * pathname, int flag, int mode,
 		iput(dir);
 		return -EISDIR;
 	}
-	bh = find_entry(&dir,basename,namelen,&de);
+	bh = find_entry(&dir,basename,namelen,&de); // 枝梢目录文件，放在缓冲区中
 	if (!bh) {
 		if (!(flag & O_CREAT)) {
 			iput(dir);
@@ -376,9 +378,9 @@ int open_namei(const char * pathname, int flag, int mode,
 			return -ENOSPC;
 		}
 		inode->i_uid = current->euid;
-		inode->i_mode = mode;
+		inode->i_mode = mode; // 设置 imode
 		inode->i_dirt = 1;
-		bh = add_entry(dir,basename,namelen,&de);
+		bh = add_entry(dir,basename,namelen,&de); // 没有文件就新建文件
 		if (!bh) {
 			inode->i_nlinks--;
 			iput(inode);
@@ -392,13 +394,13 @@ int open_namei(const char * pathname, int flag, int mode,
 		*res_inode = inode;
 		return 0;
 	}
-	inr = de->inode;
-	dev = dir->i_dev;
-	brelse(bh);
+	inr = de->inode; // i number
+	dev = dir->i_dev; // 设备号
+	brelse(bh); // 找到了就释放 缓冲块和inode_table
 	iput(dir);
 	if (flag & O_EXCL)
 		return -EEXIST;
-	if (!(inode=iget(dev,inr)))
+	if (!(inode=iget(dev,inr))) // 基于至少inode的dev和inr，寻找目标文件的 inode
 		return -EACCES;
 	if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
 	    !permission(inode,ACC_MODE(flag))) {
@@ -408,7 +410,7 @@ int open_namei(const char * pathname, int flag, int mode,
 	inode->i_atime = CURRENT_TIME;
 	if (flag & O_TRUNC)
 		truncate(inode);
-	*res_inode = inode;
+	*res_inode = inode; // 找到后放到inode_table中
 	return 0;
 }
 

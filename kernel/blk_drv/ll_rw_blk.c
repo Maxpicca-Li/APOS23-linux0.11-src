@@ -37,8 +37,8 @@ struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL },		/* dev mem 内存 ramdisk */
 	{ NULL, NULL },		/* dev fd 软驱设备 */
 	{ NULL, NULL },		/* dev hd 硬盘设备 */
-	{ NULL, NULL },		/* dev ttyx */
-	{ NULL, NULL },		/* dev tty */
+	{ NULL, NULL },		/* dev ttyx 虚拟控制台，X是一个数字，代表不同的虚拟终端*/
+	{ NULL, NULL },		/* dev tty 终端设备的一般表示*/
 	{ NULL, NULL }		/* dev lp 打印机设备 */
 };
 
