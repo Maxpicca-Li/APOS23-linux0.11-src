@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "tty.h": "c",
-        "io.h": "c",
-        "sched.h": "c",
-        "stat.h": "c",
-        "config.h": "c"
-    }
-}

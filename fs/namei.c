@@ -88,6 +88,7 @@ static int match(int len,const char * name,struct dir_entry * de)
  * This also takes care of the few special cases due to '..'-traversal
  * over a pseudo-root and a mount point.
  * 根据目录文件 i 节点和目录名信息，获取目录文件中的目录项。
+ * find_entry 仅针对目录 dir，不针对文件 file
  */
 static struct buffer_head * find_entry(struct m_inode ** dir,
 	const char * name, int namelen, struct dir_entry ** res_dir)
@@ -128,11 +129,11 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	}
 	if (!(block = (*dir)->i_zone[0]))
 		return NULL;
-	if (!(bh = bread((*dir)->i_dev,block)))
+	if (!(bh = bread((*dir)->i_dev,block))) // 设备号、块号
 		return NULL;
 	i = 0;
-	de = (struct dir_entry *) bh->b_data;
-	while (i < entries) {
+	de = (struct dir_entry *) bh->b_data; // 数据本身，存放的是 dir_entry 数组，一个 buffer 1KB, 一项 16B，共 64 个
+	while (i < entries) { // 读每个 dir_entry
 		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
 			brelse(bh);
 			bh = NULL;
@@ -143,7 +144,7 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 			}
 			de = (struct dir_entry *) bh->b_data;
 		}
-		if (match(namelen,name,de)) {
+		if (match(namelen,name,de)) { // 检查 name 是否匹配
 			*res_dir = de;
 			return bh;
 		}

@@ -137,6 +137,7 @@ static int _bmap(struct m_inode * inode,int block,int create)
 	return i;
 }
 
+// 根据 i 节点信息取文件数据块 block 在设备上对应的逻辑块号。
 int bmap(struct m_inode * inode,int block)
 {
 	return _bmap(inode,block,0);
@@ -175,7 +176,7 @@ void iput(struct m_inode * inode)
 	}
 repeat:
 	if (inode->i_count>1) {
-		inode->i_count--;
+		inode->i_count--; // i_count 计数减少才能释放
 		return;
 	}
 	if (!inode->i_nlinks) {
@@ -249,7 +250,7 @@ struct m_inode * iget(int dev,int nr)
 
 	if (!dev)
 		panic("iget with dev==0");
-	empty = get_empty_inode();
+	empty = get_empty_inode(); // 先找一个空的占位，再去看有没有现成的
 	inode = inode_table;
 	while (inode < NR_INODE+inode_table) {
 		if (inode->i_dev != dev || inode->i_num != nr) {
@@ -300,7 +301,7 @@ static void read_inode(struct m_inode * inode)
 	int block;
 
 	lock_inode(inode);
-	if (!(sb=get_super(inode->i_dev)))
+	if (!(sb=get_super(inode->i_dev))) // 通过设备号找到超级块号
 		panic("trying to read inode without dev");
 	block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
 		(inode->i_num-1)/INODES_PER_BLOCK;

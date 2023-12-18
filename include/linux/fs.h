@@ -98,7 +98,7 @@ struct m_inode {    // memory i 节点 --> 通电使用
 	unsigned long i_mtime; // 文件修改时间（自 1970.1.1:0 算起，秒）
 	unsigned char i_gid; // 组 id(文件拥有者所在的组)。
 	unsigned char i_nlinks; // 文件目录项链接数。
-	unsigned short i_zone[9]; // 直接(0-6)、间接(7)或双重间接(8)逻辑块号。zone 是区的意思，可译成区段，或逻辑块。
+	unsigned short i_zone[9]; // 直接(0-6)、间接(7)或双重间接(8)【逻辑块号】。zone 是区的意思，可译成区段，或逻辑块。
 /* these are in memory also */
 	struct task_struct * i_wait; // 等待该 i 节点的进程
 	unsigned long i_atime; // 最后访问时间。
@@ -156,7 +156,7 @@ struct d_super_block {
 };
 
 struct dir_entry { // 针对目录，共16字节。如果一个目录文件占一个缓冲块（1024字节），那么能放64个目录项
-	unsigned short inode; // i节点位图的索引 --> inode number
+	unsigned short inode; // i节点位图的索引 --> inode number --> 目录项指向的 inode 号
 	char name[NAME_LEN];
 };
 

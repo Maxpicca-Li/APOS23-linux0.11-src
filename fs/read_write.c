@@ -52,6 +52,8 @@ int sys_lseek(unsigned int fd,off_t offset, int origin)
 	return file->f_pos;
 }
 
+//// 读文件系统调用函数。 
+// 参数 fd 是文件句柄，buf 是用户的目标缓冲区，count 是欲读字节数。 --> 少了读取的 offset
 int sys_read(unsigned int fd,char * buf,int count)
 {
 	struct file * file;
