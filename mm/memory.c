@@ -384,8 +384,8 @@ void do_no_page(unsigned long error_code,unsigned long address)
 	unsigned long page;
 	int block,i;
 
-	address &= 0xfffff000;
-	tmp = address - current->start_code;
+	address &= 0xfffff000; // 取其所在页的起始地址
+	tmp = address - current->start_code; // 相较于代码段起始地址的偏移
 	if (!current->executable || tmp >= current->end_data) {
 		get_empty_page(address);
 		return;
@@ -393,11 +393,11 @@ void do_no_page(unsigned long error_code,unsigned long address)
 	if (share_page(tmp))
 		return;
 	if (!(page = get_free_page()))
-		oom();
+		oom(); // out of memory 内存不够用
 /* remember that 1 block is used for header */
-	block = 1 + tmp/BLOCK_SIZE;
-	for (i=0 ; i<4 ; block++,i++)
-		nr[i] = bmap(current->executable,block);
+	block = 1 + tmp/BLOCK_SIZE; // 块号对应，之所以加一，是之前文件头读了一个数据块，start_code是在读了这个数据块之后才设置的
+	for (i=0 ; i<4 ; block++,i++) // 1块 1KB，1页 4KB
+		nr[i] = bmap(current->executable,block); // 获取 inode 开头第 block 的块数据
 	bread_page(page,current->executable->i_dev,nr);
 	i = tmp + 4096 - current->end_data;
 	tmp = page + 4096;
@@ -409,6 +409,7 @@ void do_no_page(unsigned long error_code,unsigned long address)
 		return;
 	free_page(page);
 	oom();
+	// 2023.12.18 17:20 完结撒花
 }
 
 void mem_init(long start_mem, long end_mem)

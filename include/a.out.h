@@ -3,7 +3,7 @@
 
 #define __GNU_EXEC_MACROS__
 
-struct exec {
+struct exec { // text --> code
   unsigned long a_magic;	/* Use macros N_MAGIC, etc for access */
   unsigned a_text;		/* length of text, in bytes */
   unsigned a_data;		/* length of data, in bytes */

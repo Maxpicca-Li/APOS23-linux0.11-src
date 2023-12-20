@@ -98,7 +98,7 @@ struct m_inode {    // memory i 节点 --> 通电使用
 	unsigned long i_mtime; // 文件修改时间（自 1970.1.1:0 算起，秒）
 	unsigned char i_gid; // 组 id(文件拥有者所在的组)。
 	unsigned char i_nlinks; // 文件目录项链接数。
-	unsigned short i_zone[9]; // 直接(0-6)、间接(7)或双重间接(8)【逻辑块号】。zone 是区的意思，可译成区段，或逻辑块。
+	unsigned short i_zone[9]; // 直接(0-6)、间接(7)或双重间接(8)【逻辑块号】。zone 是区的意思，可译成区段，或逻辑块。i_zone[0]块号包含文件头数据
 /* these are in memory also */
 	struct task_struct * i_wait; // 等待该 i 节点的进程
 	unsigned long i_atime; // 最后访问时间。

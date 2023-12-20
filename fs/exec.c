@@ -207,7 +207,7 @@ restart_interp:
 		goto exec_error2;
 	}
 	i = inode->i_mode;
-	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid;
+	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid; // 查看权限
 	e_gid = (i & S_ISGID) ? inode->i_gid : current->egid;
 	if (current->euid == inode->i_uid)
 		i >>= 6;
@@ -218,11 +218,12 @@ restart_interp:
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
-	if (!(bh = bread(inode->i_dev,inode->i_zone[0]))) {
+	// 读取第一个块，把文件头页读进来。
+	if (!(bh = bread(inode->i_dev,inode->i_zone[0]))) { // 根据设备号和块号读入， i_zone[0]块号包含文件头数据
 		retval = -EACCES;
 		goto exec_error2;
 	}
-	ex = *((struct exec *) bh->b_data);	/* read exec-header */
+	ex = *((struct exec *) bh->b_data);	/* read exec-header : 强制类型转换-->将硬盘和内存线性地址同构 */
 	if ((bh->b_data[0] == '#') && (bh->b_data[1] == '!') && (!sh_bang)) {
 		/*
 		 * This section does the #! interpretation.
@@ -295,7 +296,10 @@ restart_interp:
 		set_fs(old_fs);
 		goto restart_interp;
 	}
-	brelse(bh);
+	brelse(bh); // 数据拷贝后，就释放缓冲区
+	// 对于下列情况，将不执行程序：如果执行文件不是需求页可执行文件(ZMAGIC)、或者代码重定位部分 
+	// 长度 a_trsize 不等于 0、或者数据重定位信息长度不等于 0、或者代码段+数据段+堆段长度超过 50MB、 
+	// 或者 i 节点表明的该执行文件长度小于代码段+数据段+符号表长度+执行头部分长度的总和。
 	if (N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
 		ex.a_text+ex.a_data+ex.a_bss>0x3000000 ||
 		inode->i_size < ex.a_text+ex.a_data+ex.a_syms+N_TXTOFF(ex)) {
@@ -325,24 +329,32 @@ restart_interp:
 		if ((current->close_on_exec>>i)&1)
 			sys_close(i);
 	current->close_on_exec = 0;
+	// 彻底和父进程那里拷贝来的页表脱钩 --> 前期要复制是因为，子进程也要运行，运行需要空间，也需要页表分配， 比如执行 execve 前期这段，需要共享父进程的代码，加载并（子进程自己）执行。 --> 脱钩脱的是父进程的用户态
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+	// 如果“上次任务使用了协处理器”指向的是当前进程，则将其置空，并复位使用了协处理器的标志。
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
 	current->used_math = 0;
-	p += change_ldt(ex.a_text,page)-MAX_ARG_PAGES*PAGE_SIZE;
+	p += change_ldt(ex.a_text,page)-MAX_ARG_PAGES*PAGE_SIZE; // 重新设置 ldt
 	p = (unsigned long) create_tables((char *)p,argc,envc);
+	// NOTE lyq: 虚拟拷贝对其的关键
+	// 1. brk 总长度（字节数）
 	current->brk = ex.a_bss +
 		(current->end_data = ex.a_data +
 		(current->end_code = ex.a_text));
+	// 2. 堆栈段地址
 	current->start_stack = p & 0xfffff000;
+	// 3. 有效用户 uid 和 组标识号（gid）
 	current->euid = e_uid;
 	current->egid = e_gid;
-	i = ex.a_text+ex.a_data;
+	i = ex.a_text+ex.a_data; // FIXME lyq: how to understand?
 	while (i&0xfff)
 		put_fs_byte(0,(char *) (i++));
-	eip[0] = ex.a_entry;		/* eip, magic happens :-) */
+	// 更新 eip 值
+	eip[0] = ex.a_entry;		/* eip, magic happens :-)  a_entry是该文件起始执行地址*/
 	eip[3] = p;			/* stack pointer */
+	// 子进程，从 fork 那里一口气执行到这里。
 	return 0;
 exec_error2:
 	iput(inode);

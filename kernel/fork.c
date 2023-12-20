@@ -122,7 +122,7 @@ int copy_process(
 	p->tss.trace_bitmap = 0x80000000;
 	if (last_task_used_math == current)
 		__asm__("clts ; fnsave %0"::"m" (p->tss.i387));
-	if (copy_mem(nr,p)) {
+	if (copy_mem(nr,p)) { // 分配页目录表项和页表项
 		task[nr] = NULL;
 		free_page((long) p);
 		return -EAGAIN;
@@ -134,7 +134,7 @@ int copy_process(
 		current->pwd->i_count++;    // 指向当前进程的指针
 	if (current->root)
 		current->root->i_count++;
-	if (current->executable)
+	if (current->executable) // 可执行文件的m_inode
 		current->executable->i_count++;
 	// 每次新建进程，都会设置 tss & ldt，进程 0 的在 sched_init 中进行初始化
 	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));

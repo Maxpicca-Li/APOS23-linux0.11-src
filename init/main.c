@@ -183,7 +183,9 @@ void init(void)
 	printf("%d buffers = %d bytes buffer space\n\r",NR_BUFFERS,
 		NR_BUFFERS*BLOCK_SIZE);
 	printf("Free mem: %d bytes\n\r",memory_end-main_memory_start);
-	if (!(pid=fork())) {
+	if (!(pid=fork())) { // NOTE lyq: 所有父进程创建子进程，子进程加载自己的文件的必备流程
+		// 这里由子进程执行
+		// 下面 fork()用于创建一个子进程(任务 2)。对于被创建的子进程，fork()将返回 0 值，对于原进程 // (父进程)则返回子进程的进程号 pid。所以 180-184 句是子进程执行的内容。该子进程关闭了句柄 // 0(stdin)、以只读方式打开/etc/rc 文件，并使用 execve()函数将进程自身替换成/bin/sh 程序 // (即 shell 程序)，然后执行/bin/sh 程序。所带参数和环境变量分别由 argv_rc 和 envp_rc 数组 // 给出。关于 execve()请参见 fs/exec.c 程序，182 行。 // 函数_exit()退出时的出错码 1 – 操作未许可；2 -- 文件或目录不存在。
 		close(0);
 		if (open("/etc/rc",O_RDONLY,0))
 			_exit(1);
@@ -191,6 +193,7 @@ void init(void)
 		_exit(2);
 	}
 	if (pid>0)
+		// 这里由父进程执行
 		while (pid != wait(&i))
 			/* nothing */;
 	while (1) {
