@@ -147,7 +147,7 @@ repeat:
 	add_request(major+blk_dev,req); // 加载请求项，blk_dev 是那个数组，blk_dev+major 刚好是 hd 那项
 }
 
-void ll_rw_block(int rw, struct buffer_head * bh) // 底层（low layer）块设备操作
+void ll_rw_block(int rw, struct buffer_head * bh) // 底层（low level）块设备操作
 {
 	unsigned int major;
 

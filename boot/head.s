@@ -21,7 +21,7 @@ startup_32:                 # virtual address 0x0000
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss _stack_start,%esp   # lss 用户载入指令，设置用户栈，设置大小为 PAGE_SIZE 4KB
+	lss _stack_start,%esp   # lss load stack start 用户载入指令，设置用户栈，设置大小为 PAGE_SIZE 4KB --> 指向user_stack最末位置
 	call setup_idt
 	call setup_gdt          # FIXME lyq: 为什么要重复做一次
 	movl $0x10,%eax		# reload all the segment registers
@@ -203,10 +203,11 @@ setup_paging:
 	movl $1024*5,%ecx		/* 5 pages - pg_dir+4 page tables */
 	xorl %eax,%eax          # 清零
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
-	cld;rep;stosl           # FIXME lyq: 调整方向
-	# 7=0b111, 用于设置页属性, |...|1|1|1| ==> |...|特权|可读写|存在性| 
+	cld						;rep;stosl 分号表示注释
+	# 7=0b111, 用于设置页属性, |...|1|1|1| ==> |...|特权 [u]/s |可读写 r/[rw] |存在性 present| 
 	# 因为之后会和进程 0 共享，所以特权设置为 user
 	# 全部是恒等映射，进行分页
+	# 填写_pg_dir
     movl $pg0+7,_pg_dir		/* set present bit/user r/w */
 	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
@@ -214,9 +215,11 @@ setup_paging:
 	movl $pg3+4092,%edi     # 覆盖页目录项
 	movl $0xfff007,%eax		# 覆盖页表项 /*  16Mb - 4096 + 7 (r/w user,p) */
 	std
+	# 填写 pg[0-3，由高到低填写
 1:	stosl			/* fill pages backwards - more efficient :-) */
 	subl $0x1000,%eax
 	jge 1b
+	# 设置页目录表基址寄存器
 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
 	movl %eax,%cr3		/* cr3 - page directory start */
 	movl %cr0,%eax      # eax = cr0

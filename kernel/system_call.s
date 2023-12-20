@@ -39,11 +39,11 @@ EDX		= 0x0C
 FS		= 0x10
 ES		= 0x14
 DS		= 0x18
-EIP		= 0x1C
-CS		= 0x20
-EFLAGS		= 0x24
-OLDESP		= 0x28
-OLDSS		= 0x2C
+EIP		= 0x1C # eip[0]
+CS		= 0x20 # eip[1]
+EFLAGS		= 0x24 # eip[2]
+OLDESP		= 0x28 # eip[3] 当有特权级变化时
+OLDSS		= 0x2C # eip[4]
 
 state	= 0		# these are offsets into the task-struct.
 counter	= 4
@@ -202,9 +202,9 @@ _timer_interrupt:
 .align 2
 _sys_execve:
 	lea EIP(%esp),%eax
-	pushl %eax
-	call _do_execve
-	addl $4,%esp
+	pushl %eax # eax 压栈
+	call _do_execve # 调用 do_execve()
+	addl $4,%esp # 丢弃调用时压入栈的 EIP 值。
 	ret
 
 .align 2

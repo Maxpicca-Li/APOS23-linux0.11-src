@@ -34,7 +34,7 @@ begbss:
 .text
 
 entry start
-start:              ! 拷贝系统数据
+start:              ! 拷贝机器系统数据
 
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
@@ -196,8 +196,8 @@ end_move:
 ! 设置 CR0.PF 开启保护模式
 
 	mov	ax,#0x0001	! protected mode (PE) bit ! 保护模式新纪元
-	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs) ! 和 cs 结构相关，跳到 head.s 继续执行 
+	lmsw	ax		! This is it! LMSW（Load Machine Status Word）是一种指令，用于加载最低有效的16位数据到控制寄存器 CR0
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs) ! 和 cs 结构相关，跳到 head.s 继续执行 --> 8 为段选择符，0b1|0|00, 1 idx=1, 0 GDT, 00 特权级 #NOTE lyq 重点代码
 
 ! This routine checks that the keyboard command queue is empty
 ! No timeout is used - if this hangs there is something wrong with
