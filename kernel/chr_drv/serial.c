@@ -41,7 +41,7 @@ void rs_init(void)
 	set_intr_gate(0x23,rs2_interrupt);
 	init(tty_table[1].read_q.data);
 	init(tty_table[2].read_q.data);
-	outb(inb_p(0x21)&0xE7,0x21);
+	outb(inb_p(0x21)&0xE7,0x21); // 允许中断控制器 8259A IRQ3, IRQ4
 }
 
 /*

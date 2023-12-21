@@ -1,5 +1,5 @@
 #define move_to_user_mode() \
-/*
+/* NOTE lyq 重要!手动模拟中断调用和返回动作。
 eax=esp
 这里的 %%esp 是 0、3 特权共用的栈，iret前是0特权的，iret后是3特权的，为进程0的用户栈。
 push 5个值到 user_stack，模拟了3特权级的中断压栈过程。进程0和内核的段基址一致，所以这里的 push 最后 iret 后就进入进程0了
@@ -22,14 +22,14 @@ iret 中断返回，和 main 函数手法类似
 
 之所以此时是进程0的，是因为 sched_init 中 ldtr 和 tr 设置为了进程 0
 */
-__asm__ ("movl %%esp,%%eax\n\t" \
-	"pushl $0x17\n\t" \
-	"pushl %%eax\n\t" \
-	"pushfl\n\t" \
-	"pushl $0x0f\n\t" \
-	"pushl $1f\n\t" \
-	"iret\n" \
-	"1:\tmovl $0x17,%%eax\n\t" \
+__asm__ ("movl %%esp,%%eax\n\t" /* 之后开始【压栈保护现场】 */\
+	"pushl $0x17\n\t" /* $0x17->ss */\
+	"pushl %%eax\n\t" /* esp */\
+	"pushfl\n\t" /* EFLAGS */\
+	"pushl $0x0f\n\t" /* 0x0f->cs */\
+	"pushl $1f\n\t" /* $1f->next eip，这里指向的下一条是1: */\
+	"iret\n" /* 【出栈恢复现场】，该指令会pop出之前的设置，翻转特权级从0到3，3由上面的ss、cs制定 */\
+	"1:\tmovl $0x17,%%eax\n\t" /* 出栈后到这里，开始设置 ds, es, fs, gs*/\
 	"movw %%ax,%%ds\n\t" \
 	"movw %%ax,%%es\n\t" \
 	"movw %%ax,%%fs\n\t" \
@@ -70,16 +70,15 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 	"d" ((char *) (addr)),"a" (0x00080000))
 // (char *) 指针也有类型，当时只找到字节指针，所以用的char *，但是后来用 (void *) 来代表指针类型
 
-// TODO lyq: 这里门设置的含义是什么？
-// 中断门：硬件或软件异常/中断
+// 中断门：硬中断，外部设备访问内核中断代码入口
 #define set_intr_gate(n,addr) \
 	_set_gate(&idt[n],14,0,addr)
 
-// 陷阱门：相关指令执行
+// 陷阱门：内核程序访问内核中断代码入口
 #define set_trap_gate(n,addr) \
 	_set_gate(&idt[n],15,0,addr)
 
-// 任务门：进程调用/系统调用等
+// 任务门：系统调用等用户程序访问内核中断代码入口
 #define set_system_gate(n,addr) \
 	_set_gate(&idt[n],15,3,addr)
 
@@ -94,13 +93,13 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 		((limit) & 0x0ffff); }
 
 #define _set_tssldt_desc(n,addr,type) \
-__asm__ ("movw $104,%1\n\t" \
-	"movw %%ax,%2\n\t" \
+__asm__ ("movw $104,%1\n\t" /* limit[15:0], 段限长104，G=0，限长单位为字节，故TSS/LDT限长 104B */\
+	"movw %%ax,%2\n\t" /* base[15:0] */\
 	"rorl $16,%%eax\n\t" \
-	"movb %%al,%3\n\t" \
-	"movb $" type ",%4\n\t" \
-	"movb $0x00,%5\n\t" \
-	"movb %%ah,%6\n\t" \
+	"movb %%al,%3\n\t" /* base[23:16] */\
+	"movb $" type ",%4\n\t" /* P1|DPL2|S1|类型4 */\
+	"movb $0x00,%5\n\t" /* G1|D/B1|0|AVL1|limit[19:16]4 */\
+	"movb %%ah,%6\n\t" /* base[31:24] */\
 	"rorl $16,%%eax" \
 	::"a" (addr), "m" (*(n)), "m" (*(n+2)), "m" (*(n+4)), \
 	 "m" (*(n+5)), "m" (*(n+6)), "m" (*(n+7)) \

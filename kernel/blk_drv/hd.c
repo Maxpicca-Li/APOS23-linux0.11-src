@@ -348,7 +348,7 @@ void do_hd_request(void)
 void hd_init(void)
 {
 	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
-	set_intr_gate(0x2E,&hd_interrupt); // 中断门挂载
-	outb_p(inb_p(0x21)&0xfb,0x21);
-	outb(inb_p(0xA1)&0xbf,0xA1);
+	set_intr_gate(0x2E,&hd_interrupt); // 中断服务程序挂载：设置硬盘中断
+	outb_p(inb_p(0x21)&0xfb,0x21); // 允许 8259A 发出中断请求
+	outb(inb_p(0xA1)&0xbf,0xA1); // 允许硬盘发出中断请求
 }

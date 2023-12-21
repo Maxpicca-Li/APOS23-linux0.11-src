@@ -457,7 +457,6 @@ void do_fd_request(void)
 void floppy_init(void)
 {
 	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
-	// 没有设置 set_intr_gate，而是 set_trap_gate
-	set_trap_gate(0x26,&floppy_interrupt);
-	outb(inb_p(0x21)&~0x40,0x21);
+	set_trap_gate(0x26,&floppy_interrupt); //设置软件中断
+	outb(inb_p(0x21)&~0x40,0x21); // 允许软盘发送中断
 }

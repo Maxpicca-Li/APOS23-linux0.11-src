@@ -77,7 +77,7 @@ extern struct task_struct * wait_for_request;
 /* floppy */
 #define DEVICE_NAME "floppy"
 #define DEVICE_INTR do_floppy
-#define DEVICE_REQUEST do_fd_request
+#define DEVICE_REQUEST do_fd_request // fd: floppy disk
 #define DEVICE_NR(device) ((device) & 3)
 #define DEVICE_ON(device) floppy_on(DEVICE_NR(device))
 #define DEVICE_OFF(device) floppy_off(DEVICE_NR(device))

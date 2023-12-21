@@ -202,8 +202,8 @@ void trap_init(void)
 	set_trap_gate(16,&coprocessor_error);
 	for (i=17;i<48;i++)
 		set_trap_gate(i,&reserved);
-	set_trap_gate(45,&irq13);
-	outb_p(inb_p(0x21)&0xfb,0x21);
-	outb(inb_p(0xA1)&0xdf,0xA1);
-	set_trap_gate(39,&parallel_interrupt);
+	set_trap_gate(45,&irq13); // 协处理器
+	outb_p(inb_p(0x21)&0xfb,0x21); // 允许 IRQ2 中断请求 (master 中断控制器8259A -> slave CPU)
+	outb(inb_p(0xA1)&0xdf,0xA1); // 允许 IRQ2 中断请求
+	set_trap_gate(39,&parallel_interrupt); // 设置并口（可以接打印机）
 }

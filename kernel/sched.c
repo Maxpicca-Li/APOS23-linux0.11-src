@@ -53,7 +53,7 @@ extern int system_call(void);
 // 两项共用体，一个 task_union 一个页，4KB
 union task_union {
 	struct task_struct task; // 顶多占到一页
-	char stack[PAGE_SIZE];   // 内核栈，精心测算，内核代码压栈绝对不会覆盖 task_struct
+	char stack[PAGE_SIZE];   // 进程的内核栈，精心测算，内核代码压栈绝对不会覆盖 task_struct
 };
 
 // NOTE lyq:静态全局变量，static 赋予内部链接，即其只能在定义它的源文件中访问
@@ -398,7 +398,7 @@ void sched_init(void)
 	if (sizeof(struct sigaction) != 16)
 		// printk
 		panic("Struct sigaction MUST be 16 bytes");
-	// 设置第一个 TSS（task state segment） 和 LDT ==> 和用户进程开始相关
+	// 设置第一个 TSS0（task state segment） 和 LDT0 ==> 和用户进程开始相关
 	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
 	p = gdt+2+FIRST_TSS_ENTRY; // TSS1
@@ -412,14 +412,12 @@ void sched_init(void)
 	}
 /* Clear NT, so that we won't have troubles with that later on */
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
-	ltr(0);		// load task register，指向当前的 tss
-	lldt(0);	// load ldt
-	// 设置时钟中断
-	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
-	outb_p(LATCH & 0xff , 0x40);	/* LSB */
+	ltr(0);		// 重要！将TSS挂接到TR寄存器   load task register，指向当前的 tss
+	lldt(0);	// 重要！将LDT挂接到LDTR寄存器 load ldt
+	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 ==> 设置定时器 */
+	outb_p(LATCH & 0xff , 0x40);	/* LSB => LATCH：每10ms一次始终中断 */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-	set_intr_gate(0x20,&timer_interrupt);
-	// 设置系统调用
-	outb(inb_p(0x21)&~0x01,0x21);
-	set_system_gate(0x80,&system_call);
+	set_intr_gate(0x20,&timer_interrupt); //重要！设置时钟中断，进程调度的基础
+	outb(inb_p(0x21)&~0x01,0x21); // 允许时钟中断（打开时钟中断相关屏蔽码）
+	set_system_gate(0x80,&system_call); // 重要！设置系统调用总入口，进程与内核交互的途径
 }

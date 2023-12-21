@@ -137,8 +137,8 @@ void main(void)		/* This really IS void, no error here. */
 	time_init();        // 系统时钟设置
 	sched_init();       // 进程设置+系统调用相关【重要】
 	buffer_init(buffer_memory_end); // 普通文件块设备的缓冲区->为了跑得更快
-	hd_init();          // hard disk 初始化
-	floppy_init();      // 	
+	hd_init();          // 初始化硬盘
+	floppy_init();      // 初始化软盘
 	sti();              // 因为在 setup.s line 109 关闭了中断
 	move_to_user_mode();// 转换特权级 0->3，进程0开始执行，之后的代码均为进程0来执行
     // NOTE lyq: 考题，fork 这里面的 static inline _syscall0(int,fork) inline 去不去掉的区别

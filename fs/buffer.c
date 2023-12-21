@@ -26,7 +26,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
-extern int end;
+extern int end; // 内核代码末端地址（在内核模块连接期间设置）
 // 管理 buffer
 struct buffer_head * start_buffer = (struct buffer_head *) &end;
 // 本身 buffer 给了 307 项
@@ -354,36 +354,36 @@ struct buffer_head * breada(int dev,int first, ...)
 
 void buffer_init(long buffer_end)
 {
-	struct buffer_head * h = start_buffer;
-	void * b;
+	struct buffer_head * h = start_buffer; // head
+	void * b; // behind
 	int i;
 
-	if (buffer_end == 1<<20)
-		b = (void *) (640*1024);
+	if (buffer_end == 1<<20) // 1MB 0x9FFFF~0xFFFFF 为 ROMBIOS & VGA数据
+		b = (void *) (640*1024); // 0xA0000, 0x9FFFF+1 = 0xA0000, b指向缓冲区外边缘
 	else
 		b = (void *) buffer_end;
-	while ( (b -= BLOCK_SIZE)  >= ((void *) (h+1)) ) {
+	while ( (b -= BLOCK_SIZE)  >= ((void *) (h+1)) ) { // 每次处理一对（buffer_head, 缓冲块），忽略剩余不足一对的空间
 		h->b_dev = 0;
 		h->b_dirt = 0;
 		h->b_count = 0;
 		h->b_lock = 0;
 		h->b_uptodate = 0;
 		h->b_wait = NULL;
-		h->b_next = NULL;
+		h->b_next = NULL; // next, prev 后续将与hash_table挂接
 		h->b_prev = NULL;
-		h->b_data = (char *) b;
+		h->b_data = (char *) b; // 建立数据指向
 		// 设置 hash_table 前后项的环链
-		h->b_prev_free = h-1; // bufferIdx - 1
-		h->b_next_free = h+1; // bufferIdx + 1
+		h->b_prev_free = h-1; // bufferIdx - 1，与前一个buffer_head挂接
+		h->b_next_free = h+1; // bufferIdx + 1，与后一个buffer_head挂接，形成双向链表
 		h++;
 		NR_BUFFERS++;
-		if (b == (void *) 0x100000)
+		if (b == (void *) 0x100000) // 同开头的判断
 			b = (void *) 0xA0000;
 	}
-	h--;
+	h--; // 刚好是最后一个
 	free_list = start_buffer;
-	free_list->b_prev_free = h;
-	h->b_next_free = free_list;
+	free_list->b_prev_free = h; // 指向最后一个
+	h->b_next_free = free_list; // 指向第一个，二者组成双向环链表
 	for (i=0;i<NR_HASH;i++)
-		hash_table[i]=NULL;
+		hash_table[i]=NULL; // 初始化 hash_table
 }	
