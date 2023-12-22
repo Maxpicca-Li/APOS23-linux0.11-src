@@ -50,7 +50,7 @@ struct i387_struct {
 
 struct tss_struct {
 	long	back_link;	/* 16 high bits zero */
-	long	esp0;
+	long	esp0; // esp0, esp1, esp2, esp, 对应不同特权级的栈顶位置
 	long	ss0;		/* 16 high bits zero */
 	long	esp1;
 	long	ss1;		/* 16 high bits zero */
@@ -81,7 +81,7 @@ struct task_struct {
 	long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	long counter;
 	long priority;
-	long signal;
+	long signal; // 信号量
 	struct sigaction sigaction[32];
 	long blocked;	/* bitmap of masked signals */
 /* various fields */
@@ -90,7 +90,7 @@ struct task_struct {
 	long pid,father,pgrp,session,leader;
 	unsigned short uid,euid,suid;
 	unsigned short gid,egid,sgid;
-	long alarm;
+	long alarm; // 报警定时值（滴答数）
 	long utime,stime,cutime,cstime,start_time;
 	unsigned short used_math;
 /* file system info */
@@ -102,7 +102,7 @@ struct task_struct {
 	unsigned long close_on_exec;
 	struct file * filp[NR_OPEN]; // 最多打开 20 个文件，进程的文件管理结构，filp[i] 对应一个文件管理表 file_table[i]，指向一个 i 节点管理表项 --> 允许重复打开一个文件
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
-	struct desc_struct ldt[3];
+	struct desc_struct ldt[3]; // 0-空，1-代码段 cs，2-数据和堆栈段 ds&ss。
 /* tss for this task */
 	struct tss_struct tss;
 };
@@ -159,7 +159,7 @@ extern void wake_up(struct task_struct ** p);
  */
 #define FIRST_TSS_ENTRY 4
 #define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
-// 为啥这个会涉及到 tss0 的地址？
+// _TSS(1)=0b110000, 110（6,GDT中TSS0的下标）|0 GDT|00 特权级
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
 #define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
 #define ltr(n) __asm__("ltr %%ax"::"a" (_TSS(n)))
@@ -176,29 +176,29 @@ __asm__("str %%ax\n\t" \
  * This also clears the TS-flag if the task we switched to has used
  * tha math co-processor latest.
  */
-// TODO lyq: 进程切换，类似于任务门切换，tss 段的切换
+// 进程切换，类似于任务门切换，tss 段的切换
 #define switch_to(n) {\
-struct {long a,b;} __tmp; \
-__asm__("cmpl %%ecx,_current\n\t" \
+struct {long a,b;} __tmp; /* 为ljmp的CS、EIP准备的数据结构 */\
+__asm__("cmpl %%ecx,_current\n\t" /* 如果 n 为当前进程，没必要切换，直接退出 */\
 	"je 1f\n\t" \
-	"movw %%dx,%1\n\t" \
+	"movw %%dx,%1\n\t" /* 段选择符 -> b */\
 	"xchgl %%ecx,_current\n\t" /* _current 和 %%ecx 交换 */\
-	"ljmp %0\n\t" /* long jmp %0,即参数中的段选择子，即先保存下条指令地址即eip+4到进程0的tss，恢复进程1的所有 tss 数据，无需偏移量。在此之前是进程0的内核态，在此之后是进程1的用户态。下列代码不执行，此时 sys pause->schedule->switch_to，还没有清栈，待到切换回进程0时，基于保存的 eip 调用下列代码，返回所有函数并清栈*/\
-	"cmpl %%ecx,_last_task_used_math\n\t" /* FLAG：进程0再次被调度时，回到的地方 */\
+	"ljmp %0\n\t" /* long jmp %0,即参数中的段选择子，即先保存下条指令地址即eip+4到进程0的tss，恢复进程1的所有 tss 数据，无需偏移量。在此之前是进程0的内核态，在此之后是进程1的用户态，下列的代码不执行，由此产生任务切换。此时 sys pause->schedule->switch_to，还没有清栈，待到切换回进程0时，基于保存的 eip 调用下列代码，返回所有函数并清栈*/\
+	"cmpl %%ecx,_last_task_used_math\n\t" /* 重要！进程0再次被调度时，回到的地方。判断原任务使用过协处理器吗，没有则跳转 */\
 	"jne 1f\n\t" \
-	"clts\n" \
+	"clts\n" /* 清 cr0 的 TS 标志，task swap */\
 	"1:" \
-	::"m" (*&__tmp.a),"m" (*&__tmp.b), /* 前者是段选择子，后者是偏移量，这里只用了前者 */\
-	"d" (_TSS(n)),"c" ((long) task[n])); \
+	::"m" (*&__tmp.a),"m" (*&__tmp.b), /* %0 a是偏移量EIP，%1 b是段选择子CS，这里只赋值了b, %0默认为0 */\
+	"d" (_TSS(n)),"c" ((long) task[n])); /* dx=_TSS(n)，即TSS n的索引号+权限，即其段选择符； ecx=task[n] */\
 }
 
 #define PAGE_ALIGN(n) (((n)+0xfff)&0xfffff000)
 
 #define _set_base(addr,base) \
-__asm__("movw %%dx,%0\n\t" \
+__asm__("movw %%dx,%0\n\t" /* base[15:0] */\
 	"rorl $16,%%edx\n\t" \
-	"movb %%dl,%1\n\t" \
-	"movb %%dh,%2" \
+	"movb %%dl,%1\n\t" /* base[23:16] */\
+	"movb %%dh,%2" /* base[31:24] */\
 	::"m" (*((addr)+2)), \
 	  "m" (*((addr)+4)), \
 	  "m" (*((addr)+7)), \

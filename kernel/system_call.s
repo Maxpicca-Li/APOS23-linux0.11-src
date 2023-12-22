@@ -43,7 +43,7 @@ EIP		= 0x1C # eip[0]
 CS		= 0x20 # eip[1]
 EFLAGS		= 0x24 # eip[2]
 OLDESP		= 0x28 # eip[3] 当有特权级变化时
-OLDSS		= 0x2C # eip[4]
+OLDSS		= 0x2C # eip[4] old stack segment
 
 state	= 0		# these are offsets into the task-struct.
 counter	= 4
@@ -80,34 +80,35 @@ reschedule:
 .align 2
 _system_call:
 	# 1: 判断数组是否越界；2: 拦截不确定性，防止不确定性的系统中断发生，避免其越权
+	# 若 eax 超出范围的话就在 eax 中置 -1 并退出
 	cmpl $nr_system_calls-1,%eax
 	ja bad_sys_call
 	push %ds
 	push %es
 	push %fs
 	pushl %edx
-	pushl %ecx              # push %ebx,%ecx,%edx as parameters
+	pushl %ecx              # push %ebx,%ecx,%edx as parameters --> --> 函数内用于初始化进程1的TSS
 	pushl %ebx              # to the system call
 	movl $0x10,%edx         # set up ds,es to kernel space $0x10 为内核数据段
 	mov %dx,%ds
 	mov %dx,%es
-	movl $0x17,%edx         # fs points to local data space
+	movl $0x17,%edx         # fs points to local data space 进程0 数据段
 	mov %dx,%fs
-	# _sys_call_table + %eax * 4, 为 _sys_call_table[%eax] 的物理地址
+	# _sys_call_table + %eax * 4, 为 _sys_call_table[%eax] 的物理地址，因为每项4字节
 	call _sys_call_table(,%eax,4)
 	pushl %eax              # 这里是 sys_fork 中的返回值，此时 eax 是 sys_fork 中调用的 copy_process 中返回的 last_pid
-	movl _current,%eax      # _current 进程 0
+	movl _current,%eax      # _current 进程 0, %%eax = _current，其中 current类型为struct task_struct *。
 	cmpl $0,state(%eax)     # 即进程 0 的 task_struct state，0 就绪态
 	jne reschedule          # 如果进程 0 未就绪，则进入「进程调度过程」
 	cmpl $0,counter(%eax)   # counter，即进程 0 的时间片
 	je reschedule           # 如果进程 0 时间片为0，即到时间了，则进入「进程调度过程」
 ret_from_sys_call:          # 返回 sys_call
 	movl _current,%eax		# task[0] cannot have signals
-	cmpl _task,%eax         # task 数组首地址，即进程0 --> 判断 _current 是否是进程0
+	cmpl _task,%eax         # task 数组首地址，即进程0 --> 判别当前任务是否是进程 0，如果是则不必对其进行信号量方面的处理，直接返回。
 	je 3f
-	cmpw $0x0f,CS(%esp)		# was old code segment supervisor ?
+	cmpw $0x0f,CS(%esp)		# was old code segment supervisor ? -> 通过对原调用程序代码不在用户代码段中（例如任务 1），则退出
 	jne 3f
-	cmpw $0x17,OLDSS(%esp)		# was stack segment = 0x17 ?
+	cmpw $0x17,OLDSS(%esp)		# was stack segment = 0x17 ? 如果原堆栈不在用户数据段中，则也退出
 	jne 3f
 	movl signal(%eax),%ebx
 	movl blocked(%eax),%ecx
@@ -209,18 +210,18 @@ _sys_execve:
 
 .align 2
 _sys_fork:
+# 首先调用 C 函数 find_empty_process()，取得一个进程号 pid。若返回负数则说明目前任务数组已满。若没有满则调用 copy_process()复制进程。
 	call _find_empty_process
-	# FIXME lyq: 这个啥意思
-	testl %eax,%eax
-	js 1f
-	push %gs
+	testl %eax,%eax # %eax & %eax，检查 %eax 是否为0和负数
+	js 1f # 如果 SF 被置位，即%%eax为负数，说明task[]已满。
+	push %gs  # 为 copy_process 准备参数 --> 函数内用于初始化进程1的TSS
 	pushl %esi
 	pushl %edi
 	pushl %ebp
-	pushl %eax
+	pushl %eax # find_empty_process 的返回值 --> new pid
 	call _copy_process
-	addl $20,%esp   // 加清栈，减压栈：20 = 4 * 5，5个数，把前面的 gs, esi, edi, ebp, eax丢弃掉，注意 gs 是 2 字节，但是".align 2"会让 gs 对齐增2字节，故总共20字节
-1:	ret             // 普通的 ret，而不是 iret，因为没有翻转特权级, 0->0
+	addl $20,%esp   # 加清栈，减压栈：20 = 4 * 5，5个数，把前面的 gs, esi, edi, ebp, eax丢弃掉，注意 gs 是 2 字节，但是".align 2"会让 gs 对齐增2字节，故总共20字节
+1:	ret             # 普通的 ret，而不是 iret，因为没有翻转特权级, 0->0, 返回到 _system_call 的 call _sys_call_table(,%eax,4) 下一句
 
 _hd_interrupt:
 	pushl %eax

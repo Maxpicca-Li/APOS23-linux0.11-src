@@ -59,7 +59,7 @@ union task_union {
 // NOTE lyq:静态全局变量，static 赋予内部链接，即其只能在定义它的源文件中访问
 static union task_union init_task = {INIT_TASK,};
 
-long volatile jiffies=0;
+long volatile jiffies=0; // 从开机开始算起的滴答数（10ms/滴答）
 long startup_time=0;
 // 所以 *current 指的进程0的task_struct
 struct task_struct *current = &(init_task.task);
@@ -115,13 +115,13 @@ void schedule(void)
 
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 		if (*p) {
-			if ((*p)->alarm && (*p)->alarm < jiffies) {
-					(*p)->signal |= (1<<(SIGALRM-1));
-					(*p)->alarm = 0;
+			if ((*p)->alarm && (*p)->alarm < jiffies) { // 设置了定时且定时已过
+					(*p)->signal |= (1<<(SIGALRM-1)); // 设置信号量
+					(*p)->alarm = 0; // 关闭警报
 				}
 			if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
-			(*p)->state==TASK_INTERRUPTIBLE)
-				(*p)->state=TASK_RUNNING;
+			(*p)->state==TASK_INTERRUPTIBLE) // 信号量中除被阻塞的信号外还有其它信号，且进程处于可中断状态
+				(*p)->state=TASK_RUNNING; // 设置就绪态
 		}
 
 /* this is the scheduler proper: */
@@ -137,7 +137,8 @@ void schedule(void)
 			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
 				c = (*p)->counter, next = i;
 		}
-		if (c) break;           // 如果一个都没找到，c 还是 -1，next 为 0，break 切换到0
+		if (c) break;           // 注意 c 为 counter；如果一个都没找到，c 还是 -1，next 为 0，break 切换到0
+		// 若找到的时间片为0，则重置所有进程的时间片，继续找
 		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) // 高往低遍历
 			if (*p)             // 优先级设置：该系统不单列优先级，折成时间片
 				(*p)->counter = ((*p)->counter >> 1) +
