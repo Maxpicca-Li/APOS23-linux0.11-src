@@ -41,6 +41,7 @@ static int reset = 1;
 
 /*
  *  This struct defines the HD's and their types.
+ * 各字段分别是磁头数、每磁道扇区数、柱面数、写前预补偿柱面号、磁头着陆区柱面号、控制字节。
  */
 struct hd_i_struct {
 	int head,sect,cyl,wpcom,lzone,ctl;
@@ -54,9 +55,9 @@ static int NR_HD = 0;
 #endif
 
 static struct hd_struct {
-	long start_sect;
-	long nr_sects;
-} hd[5*MAX_HD]={{0,0},}; // 每个物理逻辑盘有5个分区
+	long start_sect; // 起始扇区号
+	long nr_sects; // 总扇区数
+} hd[5*MAX_HD]={{0,0},}; // 定义硬盘分区结构
 
 #define port_read(port,buf,nr) \
 __asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr):"cx","di")
@@ -84,18 +85,18 @@ int sys_setup(void * BIOS)
 	for (drive=0 ; drive<2 ; drive++) { // 读取 drive_info，设置 hd_info, BIOS 就是 drive_info
 		hd_info[drive].cyl = *(unsigned short *) BIOS; // 柱面数
 		hd_info[drive].head = *(unsigned char *) (2+BIOS); // 磁头数
-		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS);
-		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
-		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
+		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS); // 写前预补偿柱面号
+		hd_info[drive].ctl = *(unsigned char *) (8+BIOS); // 控制字节
+		hd_info[drive].lzone = *(unsigned short *) (12+BIOS); // 磁头着陆区柱面号
 		hd_info[drive].sect = *(unsigned char *) (14+BIOS); // 每磁道扇区数
 		BIOS += 16;
 	}
-	if (hd_info[1].cyl) // 判断有几个磁盘 --> TODO lyq: 如何根据柱面数判断磁盘数
+	if (hd_info[1].cyl) // 判断有几个磁盘 --> // TODO lyq: 如何根据柱面数判断磁盘数
 		NR_HD=2;
 	else
 		NR_HD=1;
 #endif
-	for (i=0 ; i<NR_HD ; i++) { //一个物理硬盘最多可以分4个逻辑盘，0是物理盘，1～4是逻辑盘，共5个，第1个物理盘是0*5，第2个物理盘是1*5
+	for (i=0 ; i<NR_HD ; i++) { //一个物理硬盘最多可以分4个逻辑盘，故每个盘有5个分区，0是物理盘，1～4是逻辑盘；其中 5 的倍数处的项（例如 hd[0]和 hd[5]等）代表整个硬盘中的参数-->因为每个物理硬盘的0号块，为引导块，有分区信息
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = hd_info[i].head* // 扇区数
 				hd_info[i].sect*hd_info[i].cyl;
@@ -144,21 +145,20 @@ int sys_setup(void * BIOS)
 			panic("");
 		}
 		if (bh->b_data[510] != 0x55 || (unsigned char)
-		    bh->b_data[511] != 0xAA) {
+		    bh->b_data[511] != 0xAA) { // 硬盘信息有效标志：第一扇区的最后两个字节为 0x55AA
 			printk("Bad partition table on drive %d\n\r",drive);
 			panic("");
 		}
-		p = 0x1BE + (void *)bh->b_data;
-		for (i=1;i<5;i++,p++) {
-			hd[i+5*drive].start_sect = p->start_sect;
+		p = 0x1BE + (void *)bh->b_data; // 分区表位于硬盘第 1 扇区的 0x1BE 处
+		for (i=1;i<5;i++,p++) { // 将分区表信息放入硬盘分区数据结构 hd 中
+			hd[i+5*drive].start_sect = p->start_sect; // FIXME lyq: 这里都不用类型转换的吗？黑人问号！！！
 			hd[i+5*drive].nr_sects = p->nr_sects;
 		}
-		brelse(bh);
+		brelse(bh); // 释放引导块
 	}
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
-	// 加载根文件系统 rd_load, mount_root
-	rd_load();
+	rd_load(); // 虚拟盘代替软盘，是指称为根设备
 	mount_root(); // 把虚拟文件的根设备加载到文件系统
 	return (0);
 }
@@ -192,16 +192,16 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 		panic("Trying to write bad sector");
 	if (!controller_ready())
 		panic("HD controller not ready"); // 如果等待一段时间后仍未就绪则出错，死机。
-	do_hd = intr_addr; // read_intr / write_intr
-	outb_p(hd_info[drive].ctl,HD_CMD);    // 给硬盘发命令 --> PIO & DMA 两种模式，本代码为 PIO 模式，一次拿一个扇区，一共需要2个扇区（make_request, req->nr_sectors=2），故一个命令跑两次
-	port=HD_DATA;
+	do_hd = intr_addr; // read_intr / write_intr，读盘服务程序与硬盘中断操作程序相挂接，do_hd 函数指针将在硬盘中断程序中被调用。
+	outb_p(hd_info[drive].ctl,HD_CMD); // outb_p设置参数: 向控制寄存器(0x3f6)输出控制字节。
+	port=HD_DATA; // 置 dx 为数据寄存器端口(0x1f0)。
 	outb_p(hd_info[drive].wpcom>>2,++port);
 	outb_p(nsect,++port);
 	outb_p(sect,++port);
 	outb_p(cyl,++port);
 	outb_p(cyl>>8,++port);
 	outb_p(0xA0|(drive<<4)|head,++port);
-	outb(cmd,++port);
+	outb(cmd,++port); // 命令：发送硬盘控制命令到 8259A --> PIO & DMA 两种模式，本代码为 PIO 模式，一次拿一个扇区，一共需要2个扇区（make_request, req->nr_sectors=2），故一个命令跑两次
 }
 
 static int drive_busy(void)
@@ -255,20 +255,20 @@ static void bad_rw_intr(void)
 static void read_intr(void)
 {
 	if (win_result()) { // 硬盘情况判断
-		bad_rw_intr();
-		do_hd_request();
+		bad_rw_intr(); // 结束 request 或 重置
+		do_hd_request(); // 重新发起请求，在INIT检查中结束
 		return;
 	}
-	port_read(HD_DATA,CURRENT->buffer,256); // PIO 模式问答
-	CURRENT->errors = 0;
-	CURRENT->buffer += 512;
-	CURRENT->sector++;
+	port_read(HD_DATA,CURRENT->buffer,256); // PIO 模式问答 -> 将数据从数据寄存器口读到请求结构缓冲区，每次读一字，即2B，共256*2B=512B
+	CURRENT->errors = 0; // 清除错次数
+	CURRENT->buffer += 512; // 调整缓冲区指针，指向新的空区
+	CURRENT->sector++; // 扇区++
 	if (--CURRENT->nr_sectors) { // 读了之后，需要读的扇区数--
-		do_hd = &read_intr;      // 还有要读的内容，继续挂载
-		return;
+		do_hd = &read_intr;      // 还有要读的内容，继续挂载 do_hd (因为之前do_hd被交换为NULL/0)
+		return; // FIXME lyq: 硬盘端执行的命令被中断了，需要显示重启吗？这里好像没有这样做，即是硬盘的命令仍然继续，不需要显示重启？
 	}
-	end_request(1);				// 更新 b_uptodate
-	do_hd_request();
+	end_request(1); // 更新 b_uptodate 并解锁
+	do_hd_request(); // 重新发起请求，在INIT检查中结束
 }
 
 static void write_intr(void)
@@ -304,30 +304,30 @@ void do_hd_request(void)
 	unsigned int nsect;
 
 	INIT_REQUEST; // 这里判断是否还有剩余的请求项
-	dev = MINOR(CURRENT->dev); // 从请求中获取设备号
-	block = CURRENT->sector;   // 获取块号
-	if (dev >= 5*NR_HD || block+2 > hd[dev].nr_sects) {
+	dev = MINOR(CURRENT->dev); // 从请求中获取设备号 --> 即硬盘的哪个分区
+	block = CURRENT->sector;   // 获取起始扇区
+	if (dev >= 5*NR_HD || block+2 > hd[dev].nr_sects) { // 因为一次要求读写 2 个扇区（缓冲块1KB=512B*2），所以请求的扇区号不能大于分区中最后倒数第二个扇区号
 		end_request(0);
 		goto repeat;
 	}
 	block += hd[dev].start_sect;
 	dev /= 5;
 	__asm__("divl %4":"=a" (block),"=d" (sec):"0" (block),"1" (0),
-		"r" (hd_info[dev].sect)); // 基于块号换算磁头、扇区、柱面等参数
+		"r" (hd_info[dev].sect)); // 基于扇区数和磁头数，换算扇区号(sec)、所在柱面号(cyl)和磁头号(head)。
 	__asm__("divl %4":"=a" (cyl),"=d" (head):"0" (block),"1" (0),
 		"r" (hd_info[dev].head));
 	sec++;
 	nsect = CURRENT->nr_sectors;
 	if (reset) {
-		reset = 0;
-		recalibrate = 1;
-		reset_hd(CURRENT_DEV);
+		reset = 0; // 防止多次执行 if reset
+		recalibrate = 1; // 防止多次执行 if recalibrate
+		reset_hd(CURRENT_DEV); // 将通过调用 hd_out 向硬盘发送 WIN_SPECIFY 命令，建立硬盘读盘必要参数
 		return;
 	}
 	if (recalibrate) { // recalibrate 重新校准
 		recalibrate = 0;
 		hd_out(dev,hd_info[CURRENT_DEV].sect,0,0,0,
-			WIN_RESTORE,&recal_intr);
+			WIN_RESTORE,&recal_intr); // 向硬盘发送 WIN_RESTORE 命令，将磁头移动到 0 柱面，以便从硬盘上读取数据。
 		return;
 	}	
 	if (CURRENT->cmd == WRITE) {

@@ -49,17 +49,17 @@
 #define ECC_ERR		0x40	/* ? */
 #define	BBD_ERR		0x80	/* ? */
 
-struct partition {
-	unsigned char boot_ind;		/* 0x80 - active (unused) */
-	unsigned char head;		/* ? */
-	unsigned char sector;		/* ? */
-	unsigned char cyl;		/* ? */
-	unsigned char sys_ind;		/* ? */
-	unsigned char end_head;		/* ? */
-	unsigned char end_sector;	/* ? */
-	unsigned char end_cyl;		/* ? */
-	unsigned int start_sect;	/* starting sector counting from 0 */
-	unsigned int nr_sects;		/* nr of sectors in partition */
+struct partition { // 硬盘分区表结构
+	unsigned char boot_ind;		/* 0x80 - active (unused)，引导标志。0x80-该分区可引导操作系统 */
+	unsigned char head;		/* 分区起始磁头号 */
+	unsigned char sector;		/* 分区起始扇区号(位 0-5)和起始柱面号高 2 位(位 6-7) */
+	unsigned char cyl;		/* 分区起始柱面号低 8 位 */
+	unsigned char sys_ind;		/* 分区类型字节。0x0b-DOS; 0x80-Old Minix; 0x83-Linux */
+	unsigned char end_head;		/* 分区的结束磁头号 */
+	unsigned char end_sector;	/* 结束扇区号(位 0-5)和结束柱面号高 2 位(位 6-7) */
+	unsigned char end_cyl;		/* 结束柱面号低 8 位 */
+	unsigned int start_sect;	/* starting sector counting from 0，分区起始物理扇区号（从 0 开始计） */
+	unsigned int nr_sects;		/* nr of sectors in partition，分区占用的扇区数 */
 };
 
 #endif

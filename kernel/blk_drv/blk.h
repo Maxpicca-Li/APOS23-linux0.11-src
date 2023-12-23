@@ -115,23 +115,23 @@ extern inline void unlock_buffer(struct buffer_head * bh) // 解锁缓冲块
 
 extern inline void end_request(int uptodate)
 {
-	DEVICE_OFF(CURRENT->dev);
+	DEVICE_OFF(CURRENT->dev); // 关闭设备
 	if (CURRENT->bh) {
-		CURRENT->bh->b_uptodate = uptodate; // uptodate: 可以理解为 valid, 置为1
-		unlock_buffer(CURRENT->bh);
+		CURRENT->bh->b_uptodate = uptodate; // 置更新标志
+		unlock_buffer(CURRENT->bh); // 解锁缓冲区并唤醒等待该缓冲块数据的进程
 	}
-	if (!uptodate) {
+	if (!uptodate) { // 如果更新标志为 0 则显示设备错误信息
 		printk(DEVICE_NAME " I/O error\n\r");
 		printk("dev %04x, block %d\n\r",CURRENT->dev,
 			CURRENT->bh->b_blocknr);
 	}
-	wake_up(&CURRENT->waiting); // 0.11 没有使用它
-	wake_up(&wait_for_request);
+	wake_up(&CURRENT->waiting); // 唤醒等待该请求项的进程。0.11 没有使用它，make_request中置为NULL
+	wake_up(&wait_for_request); // 唤醒等待请求的进程
 	CURRENT->dev = -1; 		 // 请求项状态：占用-->空闲 （其实这一步会被下一步覆盖的）
-	CURRENT = CURRENT->next; // 将当前请求项设置为下一个，为处理剩余请求项做准备 --> 仍然在数组中，但是脱离了请求项的队列
+	CURRENT = CURRENT->next; // 将当前请求项设置为下一个，为处理剩余请求项做准备
 }
 
-#define INIT_REQUEST /* FIXME lyq: 看逐行注释，理解细节 --> 判断是否还有剩余的请求项 */\
+#define INIT_REQUEST /* 判断是否还有剩余的请求项 */\
 repeat: \
 	if (!CURRENT) /* CURRENT为空，即没有剩余请求项 */\
 		return; \

@@ -39,7 +39,7 @@ int NR_BUFFERS = 0;
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	cli(); // 原子操作
-	while (bh->b_lock) // NOTE lyq: 可能考：为什么这里用 while 而不是 if，因为一次 sleep_on 可能等不到解锁。【在 make_request 处加锁】
+	while (bh->b_lock) // 重要！！可能考：为什么这里用 while 而不是 if：可能出现很多进程都在等待一个缓冲块。在缓冲块同步完毕，唤醒各等待进程到轮转到某一进程的过程中，很有可能此时的缓冲块又被其它进程所占用，并被加上了锁。此时如果用if()，则此进程会从之前被挂起的地方继续执行，不会再判断是否缓冲块已被占用而直接使用，就会出现错误；而如果用while()，则此进程会再次确认缓冲块是否已被占用，在确认未被占用后，才会使用，这样就不会发生之前那样的错误。【在 make_request 处加的锁】
 		sleep_on(&bh->b_wait); // b_wait 目前等的进程
 	sti();
 }
@@ -131,7 +131,7 @@ void check_disk_change(int dev)
 #define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH) // 哈希函数
 #define hash(dev,block) hash_table[_hashfn(dev,block)]
 
-static inline void remove_from_queues(struct buffer_head * bh) // TODO lyq: queue 数据结构，脱钩操作，主要是 prev 和 next 的变化
+static inline void remove_from_queues(struct buffer_head * bh) // queue 数据结构，脱钩操作，主要是 prev 和 next 的变化
 {
 /* remove from hash-queue */
 	if (bh->b_next)
@@ -139,17 +139,17 @@ static inline void remove_from_queues(struct buffer_head * bh) // TODO lyq: queu
 	if (bh->b_prev)
 		bh->b_prev->b_next = bh->b_next;
 	if (hash(bh->b_dev,bh->b_blocknr) == bh)
-		hash(bh->b_dev,bh->b_blocknr) = bh->b_next;
+		hash(bh->b_dev,bh->b_blocknr) = bh->b_next; // 注意，这里的 b_dev是上家，b_blocknr也是上家，因为 bh要去做空闲块了，如果之前在hash_table[]里面，则需要交代后事
 /* remove from free list */
 	if (!(bh->b_prev_free) || !(bh->b_next_free))
 		panic("Free block list corrupted");
 	bh->b_prev_free->b_next_free = bh->b_next_free;
 	bh->b_next_free->b_prev_free = bh->b_prev_free;
-	if (free_list == bh)
+	if (free_list == bh) // 头部处理
 		free_list = bh->b_next_free;
 }
 
-static inline void insert_into_queues(struct buffer_head * bh) // TODO lyq: queue 数据结构，插入操作，主要是 prev 和 next 的变化
+static inline void insert_into_queues(struct buffer_head * bh) // queue 数据结构，插入操作，主要是 prev 和 next 的变化
 {
 /* put at end of free list */
 	bh->b_next_free = free_list;
@@ -226,14 +226,14 @@ repeat:
 		}
 /* and repeat until we find something good */
 	} while ((tmp = tmp->b_next_free) != free_list); // 环链表，判尾
-	if (!bh) {
+	if (!bh) { // 如果 bh 还是 NULL，只有sleep_on了
 		sleep_on(&buffer_wait);
 		goto repeat;
 	}
-	wait_on_buffer(bh); //请求资源中
-	if (bh->b_count)
+	wait_on_buffer(bh); //等待解锁
+	if (bh->b_count) // 再次检查
 		goto repeat;
-	while (bh->b_dirt) {
+	while (bh->b_dirt) { // 修改过，就要同步 bh 到其 (dev, block)上，然后再使用这个新块 -> 类似cache miss replace drity
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
 		if (bh->b_count)
@@ -241,7 +241,7 @@ repeat:
 	}
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
-	if (find_buffer(dev,block))
+	if (find_buffer(dev,block)) // 因为以上只是拿到了一个空闲缓冲区，以下就要去那硬盘数据(dev, block)了 严谨
 		goto repeat;
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
@@ -255,6 +255,7 @@ repeat:
 	return bh;
 }
 
+// 释放引导块，只减少引用计数，不清除数据，以备将来可能的使用
 void brelse(struct buffer_head * buf)
 {
 	if (!buf)
@@ -280,7 +281,7 @@ struct buffer_head * bread(int dev,int block) //返回 buffer head
 		return bh;
 	// ⬆ 缓冲区 || ⬇ 请求项
 	ll_rw_block(READ,bh); // low floor
-	wait_on_buffer(bh);
+	wait_on_buffer(bh); // 等待缓冲块解锁的进程挂起
 	if (bh->b_uptodate)   // 读完了后，返回 bh
 		return bh;
 	brelse(bh);
@@ -336,14 +337,16 @@ struct buffer_head * breada(int dev,int first, ...)
 		panic("bread: getblk returned NULL\n");
 	if (!bh->b_uptodate)
 		ll_rw_block(READ,bh);
+	// 然后顺序取可变参数表中其它预读块号，并作与上面同样处理，但不引用（即随时可以被替换，预取块这么没有地位吗，哭唧唧）。注意第二个 ll_rw_block 有一个 bug。 其中的 bh 应该是 tmp。这个 bug 直到在 0.96 版的内核代码中才被纠正过来【预取内容不考】
 	while ((first=va_arg(args,int))>=0) {
 		tmp=getblk(dev,first);
 		if (tmp) {
 			if (!tmp->b_uptodate)
-				ll_rw_block(READA,bh);
+				ll_rw_block(READA,bh); 
 			tmp->b_count--;
 		}
 	}
+	// 可变参数表中所有参数处理完毕。等待第 1 个缓冲区解锁（如果已被上锁）。【预取内容不考】
 	va_end(args);
 	wait_on_buffer(bh);
 	if (bh->b_uptodate)

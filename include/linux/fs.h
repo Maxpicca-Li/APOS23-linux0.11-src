@@ -30,7 +30,7 @@
 
 void buffer_init(long buffer_end);
 
-#define MAJOR(a) (((unsigned)(a))>>8) // 低 8 位对齐并获取高位
+#define MAJOR(a) (((unsigned)(a))>>8) // 获取高8位后的数据
 #define MINOR(a) ((a)&0xff) // 获取低 8 位
 
 #define NAME_LEN 14
@@ -128,7 +128,7 @@ struct super_block {
 	unsigned short s_imap_blocks;   // i 节点位图所占用的数据块数
 	unsigned short s_zmap_blocks;   // 逻辑块位图所占用的数据块数
 	unsigned short s_firstdatazone; // 第一个数据逻辑块号
-	unsigned short s_log_zone_size; // log(数据块数/逻辑块)
+	unsigned short s_log_zone_size; // 数据块数 >> 逻辑块
 	unsigned long s_max_size;       // 文件最大长度
 	unsigned short s_magic;         // 文件系统魔数，判断文件系统是否一致
 /* These are only in memory */

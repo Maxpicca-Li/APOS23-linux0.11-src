@@ -128,7 +128,7 @@ void schedule(void)
 
 	while (1) {
 		c = -1;                 // c = 0xFFFFFFFF
-		next = 0;               // 指向下一个进程；默认进程0 【劳模进程0】
+		next = 0;               // 指向下一个进程；默认进程0 【业界称进程0为怠速进程，我称其为劳模进程】
 		i = NR_TASKS;           // i = 64
 		p = &task[NR_TASKS];
 		while (--i) {           // 高往低遍历；找就绪态，时间片最多的

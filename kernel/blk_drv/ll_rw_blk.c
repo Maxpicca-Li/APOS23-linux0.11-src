@@ -34,7 +34,7 @@ struct task_struct * wait_for_request = NULL;
  */
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL },		/* no_dev 无设备*/
-	{ NULL, NULL },		/* dev mem 内存 ramdisk */
+	{ NULL, NULL },		/* dev mem 虚拟盘 ramdisk */
 	{ NULL, NULL },		/* dev fd 软驱设备 */
 	{ NULL, NULL },		/* dev hd 硬盘设备 */
 	{ NULL, NULL },		/* dev ttyx 虚拟控制台，X是一个数字，代表不同的虚拟终端*/
@@ -100,7 +100,7 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 	if (rw_ahead = (rw == READA || rw == WRITEA)) { // READA, read ahead, 预读写
 		if (bh->b_lock) // bh 加了锁
 			return;
-		if (rw == READA) // 放弃预读写，改为普通读写
+		if (rw == READA) // 预读写，改为普通读写
 			rw = READ;
 		else
 			rw = WRITE;
@@ -108,7 +108,7 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 	if (rw!=READ && rw!=WRITE)
 		panic("Bad block dev command, must be R/W/RA/WA");
 	lock_buffer(bh); // 先加锁，避免被挪作他用 --> 存在写读的竞争/生产者和消费者竞争，就需要加 lock
-	if ((rw == WRITE && !bh->b_dirt) || (rw == READ && bh->b_uptodate)) { // 写但非脏，即不需要写hd；读但已经读过了，即不需要再读hd --> 提前终止 buffer->hd req
+	if ((rw == WRITE && !bh->b_dirt) || (rw == READ && bh->b_uptodate)) { // 写但非脏，即不需要写hd；读但已经读过了，即不需要再读hd --> 提前终止 buffer->hd req --> 严谨，里外都判断了可执行条件。
 		unlock_buffer(bh);
 		return;
 	}

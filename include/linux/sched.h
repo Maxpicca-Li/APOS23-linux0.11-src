@@ -16,9 +16,9 @@
 #error "Currently the close-on-exec-flags are in one word, max 32 files/proc"
 #endif
 
-#define TASK_RUNNING		0
-#define TASK_INTERRUPTIBLE	1
-#define TASK_UNINTERRUPTIBLE	2
+#define TASK_RUNNING		0 // 就绪态
+#define TASK_INTERRUPTIBLE	1 // 可中断等待状态
+#define TASK_UNINTERRUPTIBLE	2 // 不可中断等待状态
 #define TASK_ZOMBIE		3
 #define TASK_STOPPED		4
 
@@ -188,7 +188,7 @@ __asm__("cmpl %%ecx,_current\n\t" /* 如果 n 为当前进程，没必要切换�
 	"jne 1f\n\t" \
 	"clts\n" /* 清 cr0 的 TS 标志，task swap */\
 	"1:" \
-	::"m" (*&__tmp.a),"m" (*&__tmp.b), /* %0 a是偏移量EIP，%1 b是段选择子CS，这里只赋值了b, %0默认为0 */\
+	::"m" (*&__tmp.a),"m" (*&__tmp.b), /* %0 a是偏移量EIP，%1 b是段选择子CS，这里只赋值了b */\
 	"d" (_TSS(n)),"c" ((long) task[n])); /* dx=_TSS(n)，即TSS n的索引号+权限，即其段选择符； ecx=task[n] */\
 }
 

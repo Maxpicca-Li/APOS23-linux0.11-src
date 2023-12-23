@@ -252,18 +252,18 @@ struct m_inode * iget(int dev,int nr)
 		panic("iget with dev==0");
 	empty = get_empty_inode(); // 先找一个空的占位，再去看有没有现成的
 	inode = inode_table;
-	while (inode < NR_INODE+inode_table) {
+	while (inode < NR_INODE+inode_table) { // 看看有没有现成的
 		if (inode->i_dev != dev || inode->i_num != nr) {
 			inode++;
 			continue;
 		}
 		wait_on_inode(inode);
-		if (inode->i_dev != dev || inode->i_num != nr) {
+		if (inode->i_dev != dev || inode->i_num != nr) { // 若等待期间发生变化，则继续搜索。比如多个进程等待，但其他进程先抢占了
 			inode = inode_table;
 			continue;
 		}
 		inode->i_count++;
-		if (inode->i_mount) {
+		if (inode->i_mount) { // 如果该 i 节点是其它文件系统的安装点，则在超级块表中搜寻安装在此 i 节点的超级块。如果没有找到超级块，则直接使用该节点
 			int i;
 
 			for (i = 0 ; i<NR_SUPER ; i++)
@@ -275,6 +275,7 @@ struct m_inode * iget(int dev,int nr)
 					iput(empty);
 				return inode;
 			}
+			// 将该 i 节点写盘。从安装在此 i 节点文件系统的超级块上取设备号，并令 i 节点号为 1。然后重新扫描整个 i 节点表，取该被安装文件系统的根节点。 // FIXME lyq: 没太懂这个逻辑
 			iput(inode);
 			dev = super_block[i].s_dev;
 			nr = ROOT_INO;
@@ -290,7 +291,7 @@ struct m_inode * iget(int dev,int nr)
 	inode=empty;
 	inode->i_dev = dev;
 	inode->i_num = nr;
-	read_inode(inode);
+	read_inode(inode); // 并从相应设备上读取该 i 节点信息。返回该 i 节点
 	return inode;
 }
 
@@ -307,6 +308,7 @@ static void read_inode(struct m_inode * inode)
 		(inode->i_num-1)/INODES_PER_BLOCK;
 	if (!(bh=bread(inode->i_dev,block)))
 		panic("unable to read i-node block");
+	// 先复制再释放
 	*(struct d_inode *)inode =
 		((struct d_inode *)bh->b_data)
 			[(inode->i_num-1)%INODES_PER_BLOCK];

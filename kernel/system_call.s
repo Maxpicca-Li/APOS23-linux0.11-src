@@ -223,30 +223,30 @@ _sys_fork:
 	addl $20,%esp   # 加清栈，减压栈：20 = 4 * 5，5个数，把前面的 gs, esi, edi, ebp, eax丢弃掉，注意 gs 是 2 字节，但是".align 2"会让 gs 对齐增2字节，故总共20字节
 1:	ret             # 普通的 ret，而不是 iret，因为没有翻转特权级, 0->0, 返回到 _system_call 的 call _sys_call_table(,%eax,4) 下一句
 
-_hd_interrupt:
-	pushl %eax
+_hd_interrupt: # 中断会自动压栈 ss, esp, eflags, cs, eip
+	pushl %eax # 保存CPU状态
 	pushl %ecx
 	pushl %edx
 	push %ds
 	push %es
 	push %fs
-	movl $0x10,%eax
+	movl $0x10,%eax # ds,es 置为内核数据段
 	mov %ax,%ds
 	mov %ax,%es
-	movl $0x17,%eax
+	movl $0x17,%eax # fs 置为调用程序的局部数据段
 	mov %ax,%fs
-	movb $0x20,%al
-	outb %al,$0xA0		# EOI to interrupt controller #1
-	jmp 1f			# give port chance to breathe
-1:	jmp 1f
+	movb $0x20,%al # 由于初始化中断控制芯片时没有采用自动 EOI，所以这里需要发指令结束该硬件中断 end of interrupt
+	outb %al,$0xA0		# EOI to interrupt controller #1 发送 EOI 命令到 8259A（从）
+	jmp 1f			# give port chance to breathe 延时作用
+1:	jmp 1f # 延时作用
 1:	xorl %edx,%edx     # 异或，清零
 	xchgl _do_hd,%edx  # kernel/blk_drv/hd.c 中 do_hd = intr_addr; 【xchg 是 exchange 的缩写，表示交换两个操作数的值。后缀 l 表示操作的是长字（long），在 32 位架构中，长字通常是 32 位的。】
 	testl %edx,%edx # 【testl %edx,%edx 经常用于检查寄存器的值是否为零，作为接下来的条件跳转指令（如 jz，跳转如果零）的依据。】
 	jne 1f
-	movl $_unexpected_hd_interrupt,%edx
-1:	outb %al,$0x20
+	movl $_unexpected_hd_interrupt,%edx # 如果 _do_hd 函数为空，说明有问题
+1:	outb %al,$0x20 # 接收 8259A（主） 发送的中断控制器 EOI 指令（结束硬件中断）。
 	call *%edx		# "interesting" way of handling intr. --> 调用 intr_addr 函数(这里是 read_intr 函数)
-	pop %fs
+	pop %fs # 弹栈
 	pop %es
 	pop %ds
 	popl %edx
