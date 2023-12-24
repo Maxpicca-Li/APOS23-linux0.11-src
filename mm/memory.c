@@ -210,6 +210,8 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
  * It returns the physical address of the page gotten, 0 if
  * out of memory (either when trying to access page-table or
  * page.)
+ * page: 页地址；address: 线性空间地址
+ * 一个内存页面放置在指定地址处。它返回页面的物理地址，如果内存不够(在访问页表或页面时)，则返回 0。
  */
 unsigned long put_page(unsigned long page,unsigned long address)
 {
@@ -217,21 +219,26 @@ unsigned long put_page(unsigned long page,unsigned long address)
 
 /* NOTE !!! This uses the fact that _pg_dir=0 */
 
-	if (page < LOW_MEM || page >= HIGH_MEMORY)
+	if (page < LOW_MEM || page >= HIGH_MEMORY) // 非正常范围
 		printk("Trying to put page %p at %p\n",page,address);
-	if (mem_map[(page-LOW_MEM)>>12] != 1)
+	if (mem_map[(page-LOW_MEM)>>12] != 1) // 如果申请的页面在内存页面映射字节图中没有置位，则显示警告信息
 		printk("mem_map disagrees with %p at %p\n",page,address);
-	page_table = (unsigned long *) ((address>>20) & 0xffc);
+	// 计算指定地址在页目录表中对应的目录项指针
+	// 1. from 页目录表[页目录偏移] get 页表基址
+	page_table = (unsigned long *) ((address>>20) & 0xffc); // 0x 1111 1111 1100, 剩下两位0b00表示一项4字节
 	if ((*page_table)&1)
-		page_table = (unsigned long *) (0xfffff000 & *page_table);
+		// 如果该目录项有效(P=1)(也即指定的页表在内存中)，则从中取得指定页表的地址->page_table
+		page_table = (unsigned long *) (0xfffff000 & *page_table); // 默认_pg_dir=0
 	else {
+		// 不存在，申请空闲页面给页表使用
 		if (!(tmp=get_free_page()))
 			return 0;
-		*page_table = tmp|7;
+		*page_table = tmp|7; // U/S, R/W, P
 		page_table = (unsigned long *) tmp;
 	}
-	page_table[(address>>12) & 0x3ff] = page | 7;
-/* no need for invalidate */
+	// 2. set 页表[页表偏移]=物理页面，每个页表共可有 1024 项(0x3ff)。
+	page_table[(address>>12) & 0x3ff] = page | 7; // U/S, R/W, P
+/* no need for invalidate，不需要刷新页变换高速缓冲 */
 	return page;
 }
 
@@ -288,6 +295,7 @@ void write_verify(unsigned long address)
 	return;
 }
 
+// 取得一页空闲内存并映射到指定线性地址处
 void get_empty_page(unsigned long address)
 {
 	unsigned long tmp;
@@ -364,7 +372,7 @@ static int share_page(unsigned long address)
 
 	if (!current->executable)
 		return 0;
-	if (current->executable->i_count < 2)
+	if (current->executable->i_count < 2) // 如果只能单独执行(executable->i_count=1)，也退出。
 		return 0;
 	for (p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
 		if (!*p)
@@ -373,7 +381,7 @@ static int share_page(unsigned long address)
 			continue;
 		if ((*p)->executable != current->executable)
 			continue;
-		if (try_to_share(address,*p))
+		if (try_to_share(address,*p)) // 可执行文件相同时才共享
 			return 1;
 	}
 	return 0;
@@ -388,25 +396,27 @@ void do_no_page(unsigned long error_code,unsigned long address)
 
 	address &= 0xfffff000; // 取其所在页的起始地址
 	tmp = address - current->start_code; // 相较于代码段起始地址的偏移
-	if (!current->executable || tmp >= current->end_data) {
+	if (!current->executable || tmp >= current->end_data) { // 非加载程序导致缺页 --> 直接申请页面即可
 		get_empty_page(address);
 		return;
 	}
-	if (share_page(tmp))
+	if (share_page(tmp)) // 能共享就共享
 		return;
 	if (!(page = get_free_page()))
-		oom(); // out of memory 内存不够用
+		oom(); // out of memory 内存不够用，终止进程
 /* remember that 1 block is used for header */
 	block = 1 + tmp/BLOCK_SIZE; // 块号对应，之所以加一，是之前文件头读了一个数据块，start_code是在读了这个数据块之后才设置的
 	for (i=0 ; i<4 ; block++,i++) // 1块 1KB，1页 4KB
-		nr[i] = bmap(current->executable,block); // 获取 inode 开头第 block 的块数据
-	bread_page(page,current->executable->i_dev,nr);
-	i = tmp + 4096 - current->end_data;
+		nr[i] = bmap(current->executable,block); // 根据 i 节点信息，取数据块在设备上的对应的逻辑块号
+	// 1. 设备数据（current->executable->i_dev,nr，这里是虚拟盘载入） --> 物理空间（page）
+	bread_page(page,current->executable->i_dev,nr); // 读设备上，一个页面的数据（4 个逻辑块）到指定物理地址 page 处
+	i = tmp + 4096 - current->end_data; // 在增加了一页内存后，该页内存的部分可能会超过进程的 end_data 位置。
 	tmp = page + 4096;
 	while (i-- > 0) {
 		tmp--;
-		*(char *)tmp = 0;
+		*(char *)tmp = 0; // 物理页面超出的部分清零处理
 	}
+	// 2. 物理空间(page) -> 线性空间(address)
 	if (put_page(page,address))
 		return;
 	free_page(page);

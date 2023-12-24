@@ -121,7 +121,7 @@ void schedule(void)
 				}
 			if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
 			(*p)->state==TASK_INTERRUPTIBLE) // 信号量中除被阻塞的信号外还有其它信号，且进程处于可中断状态
-				(*p)->state=TASK_RUNNING; // 设置就绪态
+				(*p)->state=TASK_RUNNING; // 设置就绪态 --> 先处理 signal 的事情
 		}
 
 /* this is the scheduler proper: */

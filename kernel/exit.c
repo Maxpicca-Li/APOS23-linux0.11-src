@@ -103,33 +103,40 @@ int do_exit(long code)
 {
 	int i;
 
+	// 1. 释放进程代码段和数据段的页面
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+	// 2. 儿子过继
 	for (i=0 ; i<NR_TASKS ; i++)
 		if (task[i] && task[i]->father == current->pid) {
-			task[i]->father = 1;
-			if (task[i]->state == TASK_ZOMBIE)
+			task[i]->father = 1; // exit的进程的子进程过继到进程1
+			if (task[i]->state == TASK_ZOMBIE) // 如果该子进程僵死，需要向新父亲发终止信号
 				/* assumption task[1] is always init */
 				(void) send_sig(SIGCHLD, task[1], 1);
 		}
+	// 3. 文件关闭
 	for (i=0 ; i<NR_OPEN ; i++)
 		if (current->filp[i])
 			sys_close(i);
+	// 4. inode 关闭
 	iput(current->pwd);
 	current->pwd=NULL;
 	iput(current->root);
 	current->root=NULL;
 	iput(current->executable);
 	current->executable=NULL;
+	// 5. 终端 tyy 关闭，清空使用过的协处理器
 	if (current->leader && current->tty >= 0)
 		tty_table[current->tty].pgrp = 0;
 	if (last_task_used_math == current)
-		last_task_used_math = NULL;
+		last_task_used_math = NULL;	
 	if (current->leader)
 		kill_session();
+	// 6. 当前进程状态设置为僵死状态，给父亲发信号
 	current->state = TASK_ZOMBIE;
 	current->exit_code = code;
 	tell_father(current->father);
+	// 7. 进程切换，让父亲来处理
 	schedule();
 	return (-1);	/* just to suppress warnings */
 }
@@ -168,14 +175,14 @@ repeat:
 					continue;
 				put_fs_long(0x7f,stat_addr);
 				return (*p)->pid;
-			case TASK_ZOMBIE:
+			case TASK_ZOMBIE: // 即将退出的进程处于僵死状态，由父进程做善后工作
 				current->cutime += (*p)->utime;
 				current->cstime += (*p)->stime;
-				flag = (*p)->pid;
+				flag = (*p)->pid; // 子进程号记录
 				code = (*p)->exit_code;
-				release(*p);
+				release(*p); // 释放子进程 task_union 所在页面
 				put_fs_long(code,stat_addr);
-				return flag;
+				return flag; // 返回子进程号
 			default:
 				flag=1;
 				continue;
@@ -186,7 +193,7 @@ repeat:
 			return 0;
 		current->state=TASK_INTERRUPTIBLE;
 		schedule();
-		if (!(current->signal &= ~(1<<(SIGCHLD-1))))
+		if (!(current->signal &= ~(1<<(SIGCHLD-1)))) // 确定该子进程要退出，退出的话，repeat 重新处理子进程退出的问题
 			goto repeat;
 		else
 			return -EINTR;

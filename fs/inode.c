@@ -275,7 +275,7 @@ struct m_inode * iget(int dev,int nr)
 					iput(empty);
 				return inode;
 			}
-			// 将该 i 节点写盘。从安装在此 i 节点文件系统的超级块上取设备号，并令 i 节点号为 1。然后重新扫描整个 i 节点表，取该被安装文件系统的根节点。 // FIXME lyq: 没太懂这个逻辑
+			// 将该 i 节点写盘。从安装在此 i 节点文件系统的超级块上取设备号，并令 i 节点号为 1。然后重新扫描整个 i 节点表，取该被安装文件系统的根节点。
 			iput(inode);
 			dev = super_block[i].s_dev;
 			nr = ROOT_INO;

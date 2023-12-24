@@ -19,8 +19,8 @@
 #define TASK_RUNNING		0 // 就绪态
 #define TASK_INTERRUPTIBLE	1 // 可中断等待状态
 #define TASK_UNINTERRUPTIBLE	2 // 不可中断等待状态
-#define TASK_ZOMBIE		3
-#define TASK_STOPPED		4
+#define TASK_ZOMBIE		3 // 僵死状态
+#define TASK_STOPPED		4 // 停止状态
 
 #ifndef NULL
 #define NULL ((void *) 0)
@@ -99,7 +99,7 @@ struct task_struct {
 	struct m_inode * pwd;
 	struct m_inode * root;
 	struct m_inode * executable;
-	unsigned long close_on_exec;
+	unsigned long close_on_exec; // 执行时关闭文件句柄位图标志
 	struct file * filp[NR_OPEN]; // 最多打开 20 个文件，进程的文件管理结构，filp[i] 对应一个文件管理表 file_table[i]，指向一个 i 节点管理表项 --> 允许重复打开一个文件
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
 	struct desc_struct ldt[3]; // 0-空，1-代码段 cs，2-数据和堆栈段 ds&ss。

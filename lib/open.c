@@ -14,6 +14,7 @@ int open(const char * filename, int flag, ...)
 	va_list arg;
 
 	va_start(arg,flag);
+	// 软中断，映射到 sys_open()
 	__asm__("int $0x80"
 		:"=a" (res)
 		:"0" (__NR_open),"b" (filename),"c" (flag),

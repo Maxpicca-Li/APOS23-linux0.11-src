@@ -11,7 +11,7 @@
 
 .globl _page_fault
 
-_page_fault:
+_page_fault: # 页异常处理函数入口
 	xchgl %eax,(%esp)
 	pushl %ecx
 	pushl %edx
@@ -27,7 +27,7 @@ _page_fault:
 	pushl %eax
 	testl $1,%eax
 	jne 1f
-	call _do_no_page
+	call _do_no_page # 调用缺页中断处理函数，分配页面并加载一页shell程序
 	jmp 2f
 1:	call _do_wp_page
 2:	addl $8,%esp

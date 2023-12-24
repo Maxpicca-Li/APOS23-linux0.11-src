@@ -67,16 +67,18 @@ int sys_read(unsigned int fd,char * buf,int count)
 	inode = file->f_inode;
 	if (inode->i_pipe)
 		return (file->f_mode&1)?read_pipe(inode,buf,count):-EIO;
-	if (S_ISCHR(inode->i_mode))
+	if (S_ISCHR(inode->i_mode)) // 第二次shell进程读取的tyy0文件为字符设备文件
+		// 进去后，shell进程被设置为可中断等待状态，等待用户的键盘中断
+		// 至此所有进程处于可中断等待状态，故切换到进程0，系统再次怠速。
 		return rw_char(READ,inode->i_zone[0],buf,count,&file->f_pos);
 	if (S_ISBLK(inode->i_mode))
 		return block_read(inode->i_zone[0],&file->f_pos,buf,count);
-	if (S_ISDIR(inode->i_mode) || S_ISREG(inode->i_mode)) {
+	if (S_ISDIR(inode->i_mode) || S_ISREG(inode->i_mode)) { // 第一次shell进程，读取的rc文件为普通文件
 		if (count+file->f_pos > inode->i_size)
 			count = inode->i_size - file->f_pos;
 		if (count<=0)
 			return 0;
-		return file_read(inode,file,buf,count);
+		return file_read(inode,file,buf,count); // 读完返回 -ERROR，导致shell退出，调用 sys_exit
 	}
 	printk("(Read)inode->i_mode=%06o\n\r",inode->i_mode);
 	return -EINVAL;

@@ -177,40 +177,43 @@ void init(void)
 	int pid,i;
 
 	setup((void *) &drive_info);
-	(void) open("/dev/tty0",O_RDWR,0);
-	(void) dup(0);
-	(void) dup(0);
+	(void) open("/dev/tty0",O_RDWR,0); // 创建标准输入设备 --> 调用 sys_open()的方法
+	(void) dup(0); // 标准输出设备 --> 复制文件句柄的方法 sys_dup()
+	(void) dup(0); // 标准错误输出设备
 	printf("%d buffers = %d bytes buffer space\n\r",NR_BUFFERS,
-		NR_BUFFERS*BLOCK_SIZE);
+		NR_BUFFERS*BLOCK_SIZE); // 重要！！首次使用 printf，在标准输出设备支持下，显示信息
 	printf("Free mem: %d bytes\n\r",memory_end-main_memory_start);
 	if (!(pid=fork())) { // NOTE lyq: 所有父进程创建子进程，子进程加载自己的文件的必备流程
-		// 这里由子进程执行
-		// 下面 fork()用于创建一个子进程(任务 2)。对于被创建的子进程，fork()将返回 0 值，对于原进程 // (父进程)则返回子进程的进程号 pid。所以 180-184 句是子进程执行的内容。该子进程关闭了句柄 // 0(stdin)、以只读方式打开/etc/rc 文件，并使用 execve()函数将进程自身替换成/bin/sh 程序 // (即 shell 程序)，然后执行/bin/sh 程序。所带参数和环境变量分别由 argv_rc 和 envp_rc 数组 // 给出。关于 execve()请参见 fs/exec.c 程序，182 行。 // 函数_exit()退出时的出错码 1 – 操作未许可；2 -- 文件或目录不存在。
-		close(0);
-		if (open("/etc/rc",O_RDONLY,0))
+		// 这里由子进程 进程2 执行。该子进程关闭了句柄0(stdin)、以只读方式打开 /etc/rc 文件，并使用 execve()函数将进程自身替换成 /bin/sh 程序(即 shell 程序)，然后执行 /bin/sh 程序
+		// 函数_exit()退出时的出错码 1 – 操作未许可；2 -- 文件或目录不存在。
+		close(0); // 关闭标准输入设备文件
+		if (open("/etc/rc",O_RDONLY,0)) // 用 rc 文件替换该设备文件
 			_exit(1);
-		execve("/bin/sh",argv_rc,envp_rc);
+		execve("/bin/sh",argv_rc,envp_rc); // 加载 shell 程序，该程序文件路径为 /bin/sh，argv_rc和envp_rc分别是参数及环境变量
 		_exit(2);
 	}
 	if (pid>0)
-		// 这里由父进程执行
-		while (pid != wait(&i))
+		// 这里由父进程 进程1 执行
+		// wait() 如果进程1有等待退出的子进程，就为该进程的退出做善后工作；如果有子进程，但并不等待退出，则进程切换；如果没有子进程，则函数返回。
+		while (pid != wait(&i)) // pid=2, return flag=2
 			/* nothing */;
-	while (1) {
-		if ((pid=fork())<0) {
+	while (1) { // 重启 shell 进程
+		if ((pid=fork())<0) { // 进程1创建进程4，因为lastpid为4，故pid为4；但申请到的task为task[2]
 			printf("Fork failed in init\r\n");
 			continue;
 		}
 		if (!pid) {
-			close(0);close(1);close(2);
-			setsid();
-			(void) open("/dev/tty0",O_RDWR,0);
-			(void) dup(0);
-			(void) dup(0);
-			_exit(execve("/bin/sh",argv,envp));
+			// 子进程执行
+			close(0);close(1);close(2); // 新的shell进程关闭所有打开的文件
+			setsid(); // 创建新的会话
+			(void) open("/dev/tty0",O_RDWR,0); // 重新打开标准输入文件
+			(void) dup(0); // std out
+			(void) dup(0); // std error
+			_exit(execve("/bin/sh",argv,envp)); // 加载 shell 进程
 		}
 		while (1)
-			if (pid == wait(&i))
+			// 进程1执行
+			if (pid == wait(&i)) // 等待子进程退出
 				break;
 		printf("\n\rchild %d died with code %04x\n\r",pid,i);
 		sync();

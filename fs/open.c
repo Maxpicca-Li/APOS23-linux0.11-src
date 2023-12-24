@@ -147,21 +147,21 @@ int sys_open(const char * filename,int flag,int mode)
 			break;
 	if (fd>=NR_OPEN)
 		return -EINVAL;
-	current->close_on_exec &= ~(1<<fd); // 将该文件句柄【执行时关闭标志】设置为0
+	current->close_on_exec &= ~(1<<fd);
 	f=0+file_table;
 	for (i=0 ; i<NR_FILE ; i++,f++) // file_table 中找空闲项
 		if (!f->f_count) break; // f_count 为0
 	if (i>=NR_FILE)
 		return -EINVAL;
-	(current->filp[fd]=f)->f_count++; // 两个操作：filp 文件对应，f_count 基于 file 进行计数
-	if ((i=open_namei(filename,flag,mode,&inode))<0) {
+	(current->filp[fd]=f)->f_count++; // 两个操作完成flip和file_table挂载：filp 文件对应，f_count 基于 file 进行计数
+	if ((i=open_namei(filename,flag,mode,&inode))<0) { // 打开文件获取 i 节点
 		current->filp[fd]=NULL;
 		f->f_count=0;
 		return i;
 	}
 /* ttys are somewhat special (ttyxx major==4, tty major==5) */
 	if (S_ISCHR(inode->i_mode))
-		if (MAJOR(inode->i_zone[0])==4) {
+		if (MAJOR(inode->i_zone[0])==4) { // inode->i_zone[0] 存放设备号
 			if (current->leader && current->tty<0) {
 				current->tty = MINOR(inode->i_zone[0]);
 				tty_table[current->tty].pgrp = current->pgrp;
@@ -174,13 +174,15 @@ int sys_open(const char * filename,int flag,int mode)
 				return -EPERM;
 			}
 /* Likewise with block-devices: check for floppy_change */
+	// 如果打开的是块设备文件，则检查盘片是否更换，若更换则需要是高速缓冲中对应该设备的所有缓冲块失效。
 	if (S_ISBLK(inode->i_mode))
 		check_disk_change(inode->i_zone[0]);
-	f->f_mode = inode->i_mode;
-	f->f_flags = flag;
+	// 初始化文件结构。置文件结构属性和标志，
+	f->f_mode = inode->i_mode; // 文件属性
+	f->f_flags = flag; // 文件标识
 	f->f_count = 1;
-	f->f_inode = inode; // file_table 上 inode 挂载
-	f->f_pos = 0;
+	f->f_inode = inode; // file_table 上 inode 挂载，【文件与i节点建立关系】
+	f->f_pos = 0; // 文件读写指针位置
 	return (fd);
 }
 
@@ -198,11 +200,11 @@ int sys_close(unsigned int fd)
 	current->close_on_exec &= ~(1<<fd);
 	if (!(filp = current->filp[fd]))
 		return -EINVAL;
-	current->filp[fd] = NULL;
+	current->filp[fd] = NULL; // filp 和 file_table 解除关系
 	if (filp->f_count == 0)
 		panic("Close: file count is 0");
 	if (--filp->f_count)
 		return (0);
-	iput(filp->f_inode);
+	iput(filp->f_inode); // 如果文件已经没有引用了，inode 释放到设备中
 	return (0);
 }

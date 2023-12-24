@@ -202,8 +202,8 @@ _timer_interrupt:
 
 .align 2
 _sys_execve:
-	lea EIP(%esp),%eax
-	pushl %eax # eax 压栈
+	lea EIP(%esp),%eax # Load Effective Address
+	pushl %eax # eax 压栈，把 EIP 值“所在栈空间的地址值”压栈 #FIXME lyq: 用处是？
 	call _do_execve # 调用 do_execve()
 	addl $4,%esp # 丢弃调用时压入栈的 EIP 值。
 	ret

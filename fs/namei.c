@@ -87,8 +87,8 @@ static int match(int len,const char * name,struct dir_entry * de)
  *
  * This also takes care of the few special cases due to '..'-traversal
  * over a pseudo-root and a mount point.
- * 根据目录文件 i 节点和目录名信息，获取目录文件中的目录项。
- * find_entry 仅针对目录 dir，不针对文件 file
+ * 根据目录文件 i 节点和该目录下需要的文件名信息，将目标文件的目录项载入缓冲块
+ * find_entry 仅针对目录 dir 的i节点，不针对文件 file -> 只有目录才有目录项表，目录项既可能是文件也可能是目录
  */
 static struct buffer_head * find_entry(struct m_inode ** dir,
 	const char * name, int namelen, struct dir_entry ** res_dir)
@@ -106,7 +106,7 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	if (namelen > NAME_LEN)
 		namelen = NAME_LEN;
 #endif
-	entries = (*dir)->i_size / (sizeof (struct dir_entry)); // 目录项个数
+	entries = (*dir)->i_size / (sizeof (struct dir_entry)); // 目录项表的个数
 	*res_dir = NULL;
 	if (!namelen)
 		return NULL;
@@ -287,7 +287,7 @@ static struct m_inode * dir_namei(const char * pathname,
 	const char * basename;
 	struct m_inode * dir;
 
-	if (!(dir = get_dir(pathname)))
+	if (!(dir = get_dir(pathname))) // 获取枝梢i节点
 		return NULL;
 	basename = pathname;
 	while (c=get_fs_byte(pathname++))
@@ -304,6 +304,7 @@ static struct m_inode * dir_namei(const char * pathname,
  * is used by most simple commands to get the inode of a specified name.
  * Open, link etc use their own routines, but this is enough for things
  * like 'chmod' etc.
+ * 仅根据文件名获得文件的 inode，没有也不新建，直接返回NULL
  */
 struct m_inode * namei(const char * pathname)
 {
@@ -349,6 +350,7 @@ int open_namei(const char * pathname, int flag, int mode,
 	struct buffer_head * bh;
 	struct dir_entry * de;
 
+	// 如果文件访问许可模式标志是只读(0)，但文件截 0 标志 O_TRUNC 却置位了，则改为只写标志
 	if ((flag & O_TRUNC) && !(flag & O_ACCMODE))
 		flag |= O_WRONLY;
 	mode &= 0777 & ~current->umask;
@@ -364,7 +366,7 @@ int open_namei(const char * pathname, int flag, int mode,
 		return -EISDIR;
 	}
 	bh = find_entry(&dir,basename,namelen,&de); // 枝梢目录文件，放在缓冲区中
-	if (!bh) {
+	if (!bh) { // 没有文件就新建文件
 		if (!(flag & O_CREAT)) {
 			iput(dir);
 			return -ENOENT;
@@ -381,7 +383,7 @@ int open_namei(const char * pathname, int flag, int mode,
 		inode->i_uid = current->euid;
 		inode->i_mode = mode; // 设置 imode
 		inode->i_dirt = 1;
-		bh = add_entry(dir,basename,namelen,&de); // 没有文件就新建文件
+		bh = add_entry(dir,basename,namelen,&de);
 		if (!bh) {
 			inode->i_nlinks--;
 			iput(inode);
@@ -401,7 +403,7 @@ int open_namei(const char * pathname, int flag, int mode,
 	iput(dir);
 	if (flag & O_EXCL)
 		return -EEXIST;
-	if (!(inode=iget(dev,inr))) // 基于至少inode的dev和inr，寻找目标文件的 inode
+	if (!(inode=iget(dev,inr))) // 基于枝梢inode的dev和目标文件的inr，寻找目标文件的 inode
 		return -EACCES;
 	if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
 	    !permission(inode,ACC_MODE(flag))) {
@@ -411,7 +413,7 @@ int open_namei(const char * pathname, int flag, int mode,
 	inode->i_atime = CURRENT_TIME;
 	if (flag & O_TRUNC)
 		truncate(inode);
-	*res_inode = inode; // 找到后放到inode_table中
+	*res_inode = inode; // 将 inode 传递给 sys_open
 	return 0;
 }
 
