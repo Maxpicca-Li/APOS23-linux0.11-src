@@ -44,19 +44,20 @@ static void free_dind(int dev,int block)
 	free_block(dev,block);
 }
 
+// 根据inode.i_zone[9] 释放文件在外设上的所有逻辑块
 void truncate(struct m_inode * inode)
 {
 	int i;
 
-	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)))
+	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode))) // 非普通文件/目录
 		return;
 	for (i=0;i<7;i++)
 		if (inode->i_zone[i]) {
-			free_block(inode->i_dev,inode->i_zone[i]);
+			free_block(inode->i_dev,inode->i_zone[i]); // 前7项逻辑块对应的sb.zmap清0
 			inode->i_zone[i]=0;
 		}
-	free_ind(inode->i_dev,inode->i_zone[7]);
-	free_dind(inode->i_dev,inode->i_zone[8]);
+	free_ind(inode->i_dev,inode->i_zone[7]); // 一级间接块管理的所有逻辑块对应的sb.zmap清0
+	free_dind(inode->i_dev,inode->i_zone[8]); // 二级间接块管理的所有逻辑块对应的sb.zmap清0
 	inode->i_zone[7] = inode->i_zone[8] = 0;
 	inode->i_size = 0;
 	inode->i_dirt = 1;

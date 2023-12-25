@@ -188,7 +188,7 @@ int sys_open(const char * filename,int flag,int mode)
 
 int sys_creat(const char * pathname, int mode)
 {
-	return sys_open(pathname, O_CREAT | O_TRUNC, mode);
+	return sys_open(pathname, O_CREAT | O_TRUNC, mode); // 置位创建标志位 O_CREAT 和 独占标志位 O_TRUNC
 }
 
 int sys_close(unsigned int fd)

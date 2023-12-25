@@ -193,7 +193,7 @@ end_move:
 ! things as simple as possible, we do no register set-up or anything,
 ! we let the gnu-compiled 32-bit programs do that. We just jump to
 ! absolute address 0x00000, in 32-bit protected mode.
-! 设置 CR0.PF 开启保护模式
+! 设置 CR0.PE 开启保护模式
 
 	mov	ax,#0x0001	! protected mode (PE) bit ! 保护模式新纪元
 	lmsw	ax		! This is it! LMSW（Load Machine Status Word）是一种指令，用于加载最低有效的16位数据到控制寄存器 CR0

@@ -182,7 +182,7 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 #endif
 	if (!namelen)
 		return NULL;
-	if (!(block = dir->i_zone[0]))
+	if (!(block = dir->i_zone[0])) // 如果目录 i 节点指向的第一个直接磁盘块号为0
 		return NULL;
 	if (!(bh = bread(dir->i_dev,block)))
 		return NULL;
@@ -190,24 +190,24 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 	de = (struct dir_entry *) bh->b_data;
 	while (1) {
 		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
-			brelse(bh);
+			brelse(bh); // 释放该数据块
 			bh = NULL;
-			block = create_block(dir,i/DIR_ENTRIES_PER_BLOCK);
+			block = create_block(dir,i/DIR_ENTRIES_PER_BLOCK); // 创建新的数据块，加载新目录项 --> 重新申请一块磁盘块
 			if (!block)
 				return NULL;
 			if (!(bh = bread(dir->i_dev,block))) {
 				i += DIR_ENTRIES_PER_BLOCK;
 				continue;
 			}
-			de = (struct dir_entry *) bh->b_data;
+			de = (struct dir_entry *) bh->b_data; // de 指向新磁盘块开始处
 		}
-		if (i*sizeof(struct dir_entry) >= dir->i_size) {
-			de->inode=0;
+		if (i*sizeof(struct dir_entry) >= dir->i_size) { // 如果当前所操作的目录项序号 i*目录结构大小已经超过了该目录所指出的大小 i_size（这是动态更新的），则说明该第 i 个目录项还未使用
+			de->inode=0; // inode 为0，0为默认空值，没有指向
 			dir->i_size = (i+1)*sizeof(struct dir_entry);
 			dir->i_dirt = 1;
 			dir->i_ctime = CURRENT_TIME;
 		}
-		if (!de->inode) {
+		if (!de->inode) { // 若该目录项的 i 节点为空，则表示找到一个还未使用的目录项。
 			dir->i_mtime = CURRENT_TIME;
 			for (i=0; i < NAME_LEN ; i++)
 				de->name[i]=(i<namelen)?get_fs_byte(name+i):0;
@@ -218,7 +218,7 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 		de++;
 		i++;
 	}
-	brelse(bh);
+	brelse(bh); // 执行不到这里 :)
 	return NULL;
 }
 
@@ -367,15 +367,15 @@ int open_namei(const char * pathname, int flag, int mode,
 	}
 	bh = find_entry(&dir,basename,namelen,&de); // 枝梢目录文件，放在缓冲区中
 	if (!bh) { // 没有文件就新建文件
-		if (!(flag & O_CREAT)) {
+		if (!(flag & O_CREAT)) { // 如果没有置位，即不新建文件，但又没有文件，返回错误
 			iput(dir);
 			return -ENOENT;
 		}
-		if (!permission(dir,MAY_WRITE)) {
+		if (!permission(dir,MAY_WRITE)) { // 进程对该目录文件没有写入权限
 			iput(dir);
 			return -EACCES;
 		}
-		inode = new_inode(dir->i_dev);
+		inode = new_inode(dir->i_dev); // 在设备上，新建 inode
 		if (!inode) {
 			iput(dir);
 			return -ENOSPC;
@@ -383,7 +383,7 @@ int open_namei(const char * pathname, int flag, int mode,
 		inode->i_uid = current->euid;
 		inode->i_mode = mode; // 设置 imode
 		inode->i_dirt = 1;
-		bh = add_entry(dir,basename,namelen,&de);
+		bh = add_entry(dir,basename,namelen,&de); // 在上级目录项表中新建 目录项
 		if (!bh) {
 			inode->i_nlinks--;
 			iput(inode);
@@ -676,53 +676,54 @@ int sys_unlink(const char * name)
 	struct buffer_head * bh;
 	struct dir_entry * de;
 
-	if (!(dir = dir_namei(name,&namelen,&basename)))
+	if (!(dir = dir_namei(name,&namelen,&basename))) // 找到要删除文件的枝梢inode
 		return -ENOENT;
-	if (!namelen) {
+	if (!namelen) { // 如果要删除文件的文件名长度为0
 		iput(dir);
 		return -ENOENT;
 	}
-	if (!permission(dir,MAY_WRITE)) {
+	if (!permission(dir,MAY_WRITE)) { // 没有枝梢inode对应目录文件写入权限
 		iput(dir);
 		return -EPERM;
 	}
-	bh = find_entry(&dir,basename,namelen,&de);
+	bh = find_entry(&dir,basename,namelen,&de); // 获得要删除文件的目录项
 	if (!bh) {
 		iput(dir);
 		return -ENOENT;
 	}
-	if (!(inode = iget(dir->i_dev, de->inode))) {
+	if (!(inode = iget(dir->i_dev, de->inode))) { // 获得要删除文件的inode
 		iput(dir);
 		brelse(bh);
 		return -ENOENT;
 	}
 	if ((dir->i_mode & S_ISVTX) && !suser() &&
 	    current->euid != inode->i_uid &&
-	    current->euid != dir->i_uid) {
+	    current->euid != dir->i_uid) { // 如果用户进程没有删除该文件的权限
 		iput(dir);
 		iput(inode);
 		brelse(bh);
 		return -EPERM;
 	}
-	if (S_ISDIR(inode->i_mode)) {
+	if (S_ISDIR(inode->i_mode)) { // 如果要删除的文件是个目录文件
 		iput(inode);
 		iput(dir);
 		brelse(bh);
 		return -EPERM;
 	}
-	if (!inode->i_nlinks) {
+	if (!inode->i_nlinks) { // 如果链接数为0，即没有任何进程与之存在关联，则强行置1
 		printk("Deleting nonexistent file (%04x:%d), %d\n",
 			inode->i_dev,inode->i_num,inode->i_nlinks);
 		inode->i_nlinks=1;
 	}
-	de->inode = 0;
-	bh->b_dirt = 1;
+	// 文件删除工作
+	de->inode = 0; // 目录项清除
+	bh->b_dirt = 1; // 目录项所在缓冲区脏位
 	brelse(bh);
-	inode->i_nlinks--;
-	inode->i_dirt = 1;
+	inode->i_nlinks--; // 减少链接数
+	inode->i_dirt = 1; // inode 脏位置位
 	inode->i_ctime = CURRENT_TIME;
-	iput(inode);
-	iput(dir);
+	iput(inode); // 释放要删除的文件的inode --> iput 中如果 i_nlinks 为0，则会 free_inode
+	iput(dir); // 释放枝梢inode
 	return 0;
 }
 

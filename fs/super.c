@@ -237,8 +237,8 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 		iput(dir_i);
 		return -EPERM;
 	}
-	sb->s_imount=dir_i; // 挂载时，赋值 dir 的 inode
-	dir_i->i_mount=1; // 挂载后置1
+	sb->s_imount=dir_i; // 挂载时，赋值 dir 的 inode (m_inode类型)
+	dir_i->i_mount=1; // 挂载后置1 (char类型)
 	dir_i->i_dirt=1; // 修改后，dir置1/* NOTE! we don't iput(dir_i) */
 	return 0;			/* we do that in umount */
 }

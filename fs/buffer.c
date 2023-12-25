@@ -54,7 +54,7 @@ int sys_sync(void)
 	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
 		wait_on_buffer(bh);
 		if (bh->b_dirt)
-			ll_rw_block(WRITE,bh);
+			ll_rw_block(WRITE,bh); // 写设备
 	}
 	return 0;
 }
@@ -233,7 +233,7 @@ repeat:
 	wait_on_buffer(bh); //等待解锁
 	if (bh->b_count) // 再次检查
 		goto repeat;
-	while (bh->b_dirt) { // 修改过，就要同步 bh 到其 (dev, block)上，然后再使用这个新块 -> 类似cache miss replace drity
+	while (bh->b_dirt) { // 修改过，就要同步 bh 到其 (dev, block)上，然后再使用这个新块 -> 类似cache miss replace drity --> 找到空闲缓冲块，但b_dirt为1，则缓冲区无可用缓冲块，需要同步腾空
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
 		if (bh->b_count)

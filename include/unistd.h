@@ -25,9 +25,9 @@
 #define R_OK	4
 
 /* lseek */
-#define SEEK_SET	0
-#define SEEK_CUR	1
-#define SEEK_END	2
+#define SEEK_SET	0 // 从文件起始处开始偏移
+#define SEEK_CUR	1 // 从文件当前读写位置处开始偏移
+#define SEEK_END	2 // 表明从文件尾端开始偏移
 
 /* _SC stands for System Configuration. We don't use them much */
 #define _SC_ARG_MAX		1

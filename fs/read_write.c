@@ -22,6 +22,7 @@ extern int file_read(struct m_inode * inode, struct file * filp,
 extern int file_write(struct m_inode * inode, struct file * filp,
 		char * buf, int count);
 
+// 调整文件操作指针：offset 是 f_pos 新的文件读写指针偏移值；origin 是偏移的起始位置
 int sys_lseek(unsigned int fd,off_t offset, int origin)
 {
 	struct file * file;
@@ -41,7 +42,7 @@ int sys_lseek(unsigned int fd,off_t offset, int origin)
 			if (file->f_pos+offset<0) return -EINVAL;
 			file->f_pos += offset;
 			break;
-		case 2:
+		case 2: // 以文件末尾为起始点
 			if ((tmp=file->f_inode->i_size+offset) < 0)
 				return -EINVAL;
 			file->f_pos = tmp;
@@ -53,7 +54,7 @@ int sys_lseek(unsigned int fd,off_t offset, int origin)
 }
 
 //// 读文件系统调用函数。 
-// 参数 fd 是文件句柄，buf 是用户的目标缓冲区，count 是欲读字节数。 --> 少了读取的 offset
+// 参数 fd 是文件句柄，buf 是用户的目标缓冲区，count 是欲读字节数。 --> 少了读取的 offset, 由file->pos决定
 int sys_read(unsigned int fd,char * buf,int count)
 {
 	struct file * file;
@@ -63,7 +64,7 @@ int sys_read(unsigned int fd,char * buf,int count)
 		return -EINVAL;
 	if (!count)
 		return 0;
-	verify_area(buf,count);
+	verify_area(buf,count); // buf所在页面的属性验证，如果页面只读，则复制该页面
 	inode = file->f_inode;
 	if (inode->i_pipe)
 		return (file->f_mode&1)?read_pipe(inode,buf,count):-EIO;
@@ -91,7 +92,7 @@ int sys_write(unsigned int fd,char * buf,int count)
 	
 	if (fd>=NR_OPEN || count <0 || !(file=current->filp[fd]))
 		return -EINVAL;
-	if (!count)
+	if (!count) // count 写入字节数
 		return 0;
 	inode=file->f_inode;
 	if (inode->i_pipe)
