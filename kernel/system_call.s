@@ -177,7 +177,7 @@ _device_not_available:
 	ret
 
 .align 2
-_timer_interrupt:
+_timer_interrupt: # 时钟中断
 	push %ds		# save ds,es and put kernel data space
 	push %es		# into them. %fs is used by _system_call
 	push %fs

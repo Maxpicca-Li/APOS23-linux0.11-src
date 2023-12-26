@@ -338,9 +338,9 @@ void do_timer(long cpl)
 	}
 	if (current_DOR & 0xf0)
 		do_floppy_timer();
-	if ((--current->counter)>0) return;
+	if ((--current->counter)>0) return; // 判断时间片是否消减为0
 	current->counter=0;
-	if (!cpl) return; // current privilege level
+	if (!cpl) return; // current privilege level 只有在3特权级下才能时钟中断切换，0特权级下不能切换
 	schedule();
 }
 
