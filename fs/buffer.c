@@ -241,7 +241,7 @@ repeat:
 	}
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
-	if (find_buffer(dev,block)) // 因为以上只是拿到了一个空闲缓冲区，以下就要去那硬盘数据(dev, block)了 严谨
+	if (find_buffer(dev,block)) // 可能有人加载了缓冲块，所以再找一找现成的
 		goto repeat;
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */

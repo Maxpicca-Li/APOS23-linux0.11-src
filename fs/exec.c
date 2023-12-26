@@ -191,7 +191,7 @@ int do_execve(unsigned long * eip,long tmp,char * filename,
 	int e_uid, e_gid;
 	int retval;
 	int sh_bang = 0;
-	unsigned long p=PAGE_SIZE*MAX_ARG_PAGES-4;
+	unsigned long p=PAGE_SIZE*MAX_ARG_PAGES-4; // 参数和环境字符串空间中的偏移指针，初始化为指向该空间的最后一个长字处
 
 	if ((0xffff & eip[1]) != 0x000f) // 如果是内核调用了 do_execve，就会死机 -> 这里的eip是sys_execve压栈的eip，此时为进程2的eip
 		panic("execve called from supervisor mode");

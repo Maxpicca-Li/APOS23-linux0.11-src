@@ -247,18 +247,18 @@ void un_wp_page(unsigned long * table_entry)
 	unsigned long old_page,new_page;
 
 	old_page = 0xfffff000 & *table_entry;
-	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)]==1) {
-		*table_entry |= 2;
-		invalidate();
+	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)]==1) { // 如果当前计数为1
+		*table_entry |= 2; // 直接获得写权限
+		invalidate(); // 刷新TLB
 		return;
 	}
-	if (!(new_page=get_free_page()))
+	if (!(new_page=get_free_page())) // 申请新页面
 		oom();
 	if (old_page >= LOW_MEM)
-		mem_map[MAP_NR(old_page)]--;
-	*table_entry = new_page | 7;
-	invalidate();
-	copy_page(old_page,new_page);
+		mem_map[MAP_NR(old_page)]--; // 页面引用计数--
+	*table_entry = new_page | 7; // 新页面更改页表项并设置属性
+	invalidate(); // 刷新TLB
+	copy_page(old_page,new_page); // 复制页面
 }	
 
 /*
@@ -396,7 +396,7 @@ void do_no_page(unsigned long error_code,unsigned long address)
 
 	address &= 0xfffff000; // 取其所在页的起始地址
 	tmp = address - current->start_code; // 相较于代码段起始地址的偏移
-	if (!current->executable || tmp >= current->end_data) { // 非加载程序导致缺页 --> 直接申请页面即可
+	if (!current->executable || tmp >= current->end_data) { // 非加载程序导致缺页 --> 直接申请页面即可 --> tmp >= current->end_data, 如压栈时申请空闲页面
 		get_empty_page(address);
 		return;
 	}
