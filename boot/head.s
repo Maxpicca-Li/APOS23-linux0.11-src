@@ -77,20 +77,20 @@ check_x87:
  *  written by the page tables.
  */
 setup_idt:
-	lea ignore_int,%edx
+	lea ignore_int,%edx # 中断服务程序地址（临时/默认）ignore_int -> edx
 	movl $0x00080000,%eax # eax[15:0]=baseaddress[15:0], eax[31:16]=段选择子=0x0008 --> 内核代码段
 	movw %dx,%ax		/* selector = 0x0008 = cs */
-	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
+	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present %edx 构造中断描述符 */
 
-	lea _idt,%edi
-	mov $256,%ecx
+	lea _idt,%edi # 中断描述符表基址
+	mov $256,%ecx # 循环256次
 rp_sidt:
-	movl %eax,(%edi)
+	movl %eax,(%edi) # 中断描述符表 <- [edx, eax]
 	movl %edx,4(%edi)
-	addl $8,%edi
-	dec %ecx
+	addl $8,%edi # 索引+1
+	dec %ecx # 循环次数-1
 	jne rp_sidt
-	lidt idt_descr
+	lidt idt_descr # 加载中断描述符表寄存器值
 	ret
 
 /*
@@ -239,7 +239,7 @@ gdt_descr:
 	.long _gdt		# magic number, but it works for me :^)
 
 	.align 3
-_idt:	.fill 256,8,0		# idt is uninitialized
+_idt:	.fill 256,8,0		# idt is uninitialized 256项，每项8字节，填0
 
 _gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c09a0000000fff	/* 16Mb 内核代码段, 段选择子 0x8 , 基址0x00000000,限长 0fff 即1000，即 16MB */

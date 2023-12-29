@@ -78,7 +78,7 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 #define set_trap_gate(n,addr) \
 	_set_gate(&idt[n],15,0,addr)
 
-// 任务门：系统调用等用户程序访问内核中断代码入口
+// 系统调用门：系统调用等用户程序访问内核中断代码入口
 #define set_system_gate(n,addr) \
 	_set_gate(&idt[n],15,3,addr)
 
